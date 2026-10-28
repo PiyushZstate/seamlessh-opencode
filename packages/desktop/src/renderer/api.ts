@@ -67,6 +67,9 @@ export const api: ElectronAPI = {
   openLocalFile: (url) => send("FilesOpenLocalFile", { url }),
   openPath: (path, app) => invoke("FilesOpenPath", { path, application: app }).then((value) => value ?? undefined),
   revealPath: (path) => invoke("FilesRevealPath", { path }),
+  labSnapshot: (directory) => invoke("LabSnapshot", { directory }).then(mutable),
+  labAct: (directory, verb, id) => invoke("LabAct", { directory, verb, id }),
+  labLog: (directory, id) => invoke("LabLog", { directory, id }),
   readClipboardImage: () =>
     invoke("FilesReadClipboardImage").then((image) =>
       image ? { ...image, buffer: toArrayBuffer(image.buffer) } : null,

@@ -4,7 +4,7 @@ import { useDialog } from "@opencode/ui/context/dialog"
 import { isScrollKeyTarget, scrollKey, scrollKeyOwner } from "@opencode/ui/scroll-view"
 import { makeEventListener } from "@solid-primitives/event-listener"
 import { useNavigate } from "@solidjs/router"
-import { createEffect, createMemo, on, onCleanup, onMount, Show, type Accessor } from "solid-js"
+import { createEffect, createMemo, on, onCleanup, onMount, Show, type Accessor, type JSX } from "solid-js"
 import { Composer } from "@/composer/composer"
 import { VoiceComposer } from "@/voice/composer"
 import { useComposerState } from "@/composer/persistence"
@@ -392,6 +392,8 @@ export function ActiveSessionComposerRegion(props: {
   model: SessionComposerController
   suggestionBoundary: () => HTMLElement | undefined
   onReveal: (target: string) => void
+  /** The Seamlessh study's goal bar, first in the lane above the composer. */
+  goal?: JSX.Element
 }) {
   const location = useWorkspaceLocation()
   const data = useData()
@@ -510,6 +512,7 @@ export function ActiveSessionComposerRegion(props: {
       above={
         <Show when={!missing() && !props.session.data.isChild()}>
           <SessionComposerLane>
+            {props.goal}
             <SessionActivityChips subagents={subagents()} shells={shells()} onOpen={open} onStop={stop} />
             <Show when={todosVisible()}>
               <SessionTodoPill todos={todos()} />

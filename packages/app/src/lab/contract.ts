@@ -1,5 +1,4 @@
 import { Schema } from "effect"
-import { Ipc } from "@opencode/plugin/gui"
 
 /** How a project's metric improves: up or down. */
 export const Direction = Schema.Literals(["Higher", "Lower"])
@@ -70,16 +69,15 @@ export const Verb = Schema.Literals(["run", "keep", "unkeep", "cancel"])
 export type Verb = typeof Verb.Type
 
 /**
- * The Seamlessh host owns every study and experiment. Main reads them through the `seamlessh exp` CLI in the
- * session's directory, which names the project, so the window needs no connection of its own. On the web there is no
- * main process and the Lab says so.
+ * The window's way to the Seamlessh host, which owns every study and experiment. The desktop main process runs the
+ * `seamlessh exp` CLI in the session's directory, which names the project, so the window needs no connection of its
+ * own. The web build has no main process and leaves it out.
  */
-export const Lab = Ipc.define({
-  id: "lab",
-  methods: {
-    /** The study and experiments of the project the directory belongs to; none when it has no research. */
-    snapshot: { input: Schema.String, output: Snapshot },
-    /** Reruns, keeps, lets go of or stops one experiment, in the directory's project. */
-    act: { input: Schema.Struct({ directory: Schema.String, verb: Verb, id: Schema.Number }) },
-  },
-})
+export type LabHost = {
+  /** The study and experiments of the project the directory belongs to; none when it has no research. */
+  snapshot(directory: string): Promise<Snapshot>
+  /** Reruns, keeps, lets go of or stops one experiment, in the directory's project. */
+  act(directory: string, verb: Verb, id: number): Promise<void>
+  /** The end of an experiment's latest run log, as `exp log` prints it. */
+  log(directory: string, id: number): Promise<string>
+}

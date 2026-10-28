@@ -5,8 +5,15 @@ import { createSizing } from "./helpers"
 import type { SessionModel } from "./model"
 import { clampSessionPanelWidth, sessionPanelWidthCss, sessionPanelWidthMax } from "./session-panel-width"
 
-/** wide asks for the wider session minimum. */
-export function createSessionScreenLayout(session: SessionModel, input: { wide: Accessor<boolean> }) {
+/**
+ * wide asks for the wider session minimum. extra is the width, in pixels, of columns that share the chat's slot (the
+ * Seamlessh Lab's tree and page): the slot grows by it, so the chat keeps its own width and the side panel gives way.
+ */
+export function createSessionScreenLayout(
+  session: SessionModel,
+  input: { wide: Accessor<boolean>; extra?: Accessor<number> },
+) {
+  const extra = () => input.extra?.() ?? 0
   const size = createSizing()
   const view = session.layout.view
   const tabsOpen = createMemo(() => session.isDesktop() && view().side.opened() && !!session.identity.params.id)
@@ -37,14 +44,19 @@ export function createSessionScreenLayout(session: SessionModel, input: { wide: 
     }),
   )
 
+  // The slot's width with the extra columns, never wider than the row.
+  const slotWidth = createMemo(() => Math.min(resizedWidth() + extra(), available() ?? Number.POSITIVE_INFINITY))
+
   const panelWidth = createMemo(() => {
     if (!tabsOpen()) return "100%"
 
-    return sessionPanelWidthCss({
+    const css = sessionPanelWidthCss({
       width: view().session.width(),
       split: splitSide(),
       resized: view().session.resized(),
     })
+
+    return extra() > 0 ? `min(calc(${css} + ${extra()}px), 100%)` : css
   })
 
   const panelMax = createMemo(() => {
@@ -59,7 +71,7 @@ export function createSessionScreenLayout(session: SessionModel, input: { wide: 
   const sideWidth = createMemo<number | undefined>((previous) => {
     const width = available()
 
-    if (tabsOpen() && width !== undefined) return Math.max(0, width - resizedWidth())
+    if (tabsOpen() && width !== undefined) return Math.max(0, width - slotWidth())
 
     return previous
   })

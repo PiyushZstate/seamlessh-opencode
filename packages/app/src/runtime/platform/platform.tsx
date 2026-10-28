@@ -4,6 +4,7 @@ import type { Accessor } from "solid-js"
 import type { DesktopMenuAction, DesktopZoomLevel } from "@/shell/commands/desktop-menu"
 import type { DraftStore } from "@/runtime/persistence/drafts"
 import type { Bridge } from "@opencode/plugin/gui/host"
+import type { LabHost } from "@/lab/contract"
 
 type PickerPaths = string | string[] | null
 
@@ -131,6 +132,9 @@ type PlatformBase = {
 
   /** GUI plugin bridge to the main-process plugin host (desktop only). */
   plugins?: Bridge
+
+  /** The Seamlessh host's research through the `seamlessh exp` CLI (desktop only). */
+  lab?: LabHost
 }
 
 export type Platform = PlatformBase &

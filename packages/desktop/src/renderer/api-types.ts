@@ -1,4 +1,5 @@
 import type { DesktopMenuAction, DesktopZoomLevel } from "@opencode/app/desktop-menu"
+import type { Snapshot, Verb } from "@opencode/app/lab-contract"
 import type { DesktopNativeBundle } from "@opencode/app/i18n/desktop-native"
 import type { WindowBootstrap } from "../shared/window-bootstrap"
 import type {
@@ -47,6 +48,9 @@ export type ElectronAPI = {
   openLocalFile(url: string): void
   openPath(path: string, app?: string): Promise<string | undefined>
   revealPath(path: string): Promise<boolean>
+  labSnapshot(directory: string): Promise<Snapshot>
+  labAct(directory: string, verb: Verb, id: number): Promise<void>
+  labLog(directory: string, id: number): Promise<string>
   readClipboardImage(): Promise<ClipboardImage | null>
   writeClipboardText(text: string): Promise<void>
   getWindowFocused(): Promise<boolean>

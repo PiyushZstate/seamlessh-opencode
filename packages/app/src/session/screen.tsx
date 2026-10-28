@@ -49,6 +49,10 @@ import { useServer } from "@/runtime/server/current"
 import { reviewGlyphFill, SessionReviewToggle } from "./header/session-header-actions"
 import { createTimelineCache } from "./timeline/cache"
 import { createPanelMotion, holdLandingWidth, panelOpacity } from "@/shell/panel-motion"
+import { createLab } from "@/lab/state"
+import { LabTree } from "@/lab/tree"
+import { LabPage } from "@/lab/page"
+import { LabGoalBar } from "@/lab/goal-bar"
 
 export function SessionScreenView(props: { session: SessionModel }) {
   // The timeline cache captures its owner when created, so link handling must be provided above it.
@@ -118,7 +122,30 @@ function SessionScreenContent(props: {
       }),
   })
 
-  const screen = createSessionScreenLayout(session, { wide: region.wide })
+  const location = {
+    directory: () => session.data.info()?.location.directory,
+    project: createMemo(() => {
+      const info = session.data.info()
+
+      return info ? server.ctx.projects.forSession(info) : undefined
+    }),
+  }
+
+  // Seamlessh's Lab: a researching session shows chat | tree | experiment page in the chat's slot of the row.
+  const lab = createLab({
+    directory: location.directory,
+    session: session.identity.sessionKey,
+    visible: () => isDesktop() && !!session.identity.params.id,
+  })
+
+  const labTree = () => isDesktop() && lab.tree()
+  const labPage = () => (isDesktop() && lab.page() ? lab.picked() : undefined)
+
+  // The Lab's tree and page share the chat's slot and widen it by their own widths.
+  const screen = createSessionScreenLayout(session, {
+    wide: region.wide,
+    extra: () => (labTree() ? LAB_TREE_WIDTH + 8 + (labPage() ? LAB_PAGE_WIDTH + 8 : 0) : 0),
+  })
 
   const timeline = createSessionTimelineInteraction(session)
 
@@ -142,15 +169,6 @@ function SessionScreenContent(props: {
   })
 
   const sideVisible = createMemo(() => isDesktop() && screen.side.open())
-
-  const location = {
-    directory: () => session.data.info()?.location.directory,
-    project: createMemo(() => {
-      const info = session.data.info()
-
-      return info ? server.ctx.projects.forSession(info) : undefined
-    }),
-  }
 
   // The chat keeps its open width as the far end of a close's travel.
   const chatOpenWidth = createMemo<string>((previous) => (sideVisible() ? screen.panel.width() : previous), "100%")
@@ -306,7 +324,7 @@ function SessionScreenContent(props: {
           onSelectionInteraction={timeline.view.selectionInteraction}
           pinned={timeline.view.pinned()}
           centered={screen.centered()}
-          reserveReviewToggle={!sideVisible()}
+          reserveReviewToggle={!sideVisible() && !labTree()}
           setContentRef={timeline.view.setContentRef}
           bottomInset={timeline.inset()}
           setVisibleRef={timeline.view.setVisibleRef}
@@ -437,6 +455,18 @@ function SessionScreenContent(props: {
               model={model}
               suggestionBoundary={timeline.visible}
               onReveal={timeline.actions.revealPart}
+              goal={
+                <Show when={lab.snapshot()?.study}>
+                  {(study) => (
+                    <LabGoalBar
+                      study={study()}
+                      all={lab.snapshot()?.experiments ?? []}
+                      running={lab.running()}
+                      onStop={(id) => lab.act("cancel", id)}
+                    />
+                  )}
+                </Show>
+              }
             />
           )}
         </Show>
@@ -452,11 +482,25 @@ function SessionScreenContent(props: {
           {/* Keep the control outside panel animations. */}
           <Show when={isDesktop() && messagesReady() && session.identity.params.id}>
             <div
-              class="absolute end-3 top-0 z-30 h-12 flex items-center"
+              class="absolute end-3 top-0 z-30 h-12 flex items-center gap-1"
               data-slot="session-review-toggle"
               onPointerDown={hideTimelineScrollbar}
               onClick={hideTimelineScrollbar}
             >
+              <Show when={lab.researching()}>
+                <Tooltip value={language.t("research.tree.toggle")} placement="bottom">
+                  <IconButton
+                    icon={<Icon name="flask" />}
+                    variant="ghost-muted"
+                    size="large"
+                    aria-label={language.t("research.tree.toggle")}
+                    aria-expanded={lab.tree()}
+                    onMouseDown={(event: MouseEvent) => event.preventDefault()}
+                    onClick={lab.toggleTree}
+                    data-slot="lab-tree-toggle"
+                  />
+                </Tooltip>
+              </Show>
               <SessionReviewToggle
                 onToggle={region.toggle}
                 glyph={(fill) => {
@@ -477,9 +521,47 @@ function SessionScreenContent(props: {
             onKeyDown={revealTimelineScrollbar}
           >
             <Show when={!!session.identity.params.id}>
-              <SessionPanelFrame raised>
-                <ErrorBoundary fallback={sessionErrorFallback}>{sessionPanelContent()}</ErrorBoundary>
-              </SessionPanelFrame>
+              <div class="flex min-h-0 flex-1 gap-2" data-slot="session-lab-row">
+                <div class="flex min-h-0 min-w-0 flex-1 flex-col">
+                  <SessionPanelFrame raised>
+                    <ErrorBoundary fallback={sessionErrorFallback}>{sessionPanelContent()}</ErrorBoundary>
+                  </SessionPanelFrame>
+                </div>
+                <Show when={labTree()}>
+                  <div class="flex min-h-0 shrink-0 flex-col" style={{ width: `${LAB_TREE_WIDTH}px` }} data-slot="session-lab-tree">
+                    <SessionPanelFrame raised>
+                      <LabTree
+                        state={lab.state()}
+                        picked={lab.picked()?.id}
+                        running={lab.running()}
+                        onPick={lab.pick}
+                        onClose={lab.closeTree}
+                        onRetry={lab.retry}
+                        reserve={!sideVisible() && !labPage()}
+                      />
+                    </SessionPanelFrame>
+                  </div>
+                </Show>
+                <Show when={labPage()}>
+                  {(experiment) => (
+                    <div class="flex min-h-0 min-w-0 flex-1 flex-col" style={{ "flex-basis": `${LAB_PAGE_WIDTH}px` }} data-slot="session-lab-page">
+                      <SessionPanelFrame raised>
+                        <LabPage
+                          experiment={experiment()}
+                          all={lab.snapshot()?.experiments ?? []}
+                          study={lab.snapshot()?.study ?? null}
+                          tab={lab.tab()}
+                          onTab={lab.setTab}
+                          onAct={lab.act}
+                          onClose={lab.closePage}
+                          log={lab.log}
+                          reserve={!sideVisible()}
+                        />
+                      </SessionPanelFrame>
+                    </div>
+                  )}
+                </Show>
+              </div>
             </Show>
             <Show when={windowDragEnabled(platform)}>
               <SessionHeaderDrag pane={chat} gap={headerGap()} />
@@ -599,3 +681,7 @@ function SessionScreenContent(props: {
 }
 
 const BOTTOM_PANE_HEIGHT_MIN = 120
+
+const LAB_TREE_WIDTH = 340
+
+const LAB_PAGE_WIDTH = 480

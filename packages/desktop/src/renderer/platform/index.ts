@@ -53,6 +53,11 @@ export function createDesktopPlatform(api: ElectronAPI, windowState: DesktopWind
       return api.checkAppExists(appName)
     },
     plugins: createPluginBridge(),
+    lab: {
+      snapshot: (directory) => api.labSnapshot(directory),
+      act: (directory, verb, id) => api.labAct(directory, verb, id),
+      log: (directory, id) => api.labLog(directory, id),
+    },
   }
 }
 
