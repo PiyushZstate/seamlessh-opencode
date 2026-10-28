@@ -16,14 +16,16 @@ describe("icon emphasis", () => {
 })
 
 describe("contrast icon-button tokens", () => {
-  test("OC-2 dark mode uses a light background and an inverse icon matching the base surface", () => {
+  test("OC-2 dark mode draws the primary action as a white plate with dark ink (Seamlessh D10)", () => {
     const tokens = resolveThemeV2(theme).dark
     expect(tokens["v2-background-bg-icon-button-contrast"]).toBe("var(--v2-grey-400)")
     expect(tokens["v2-grey-400"]).toBe("#dbdbdbff")
     expect(tokens["v2-icon-icon-inverse"]).toBe(tokens["v2-background-bg-base"])
     expect(tokens["v2-grey-1100"]).toBe("#161616ff")
-    expect(tokens["v2-background-bg-contrast"]).toBe("var(--v2-grey-700)")
-    expect(tokens["v2-text-text-contrast"]).toBe("var(--v2-grey-50)")
+    expect(tokens["v2-background-bg-contrast"]).toBe("var(--v2-grey-100)")
+    expect(tokens["v2-text-text-contrast"]).toBe("var(--v2-grey-1100)")
+    expect(tokens["v2-grey-100"]).toBe("#fafafaff")
+    expect(contrastRatio("#161616ff", "#fafafaff")).toBeGreaterThan(7)
   })
 
   test("OC-2 light mode retains the existing contrast background and foreground", () => {
@@ -53,7 +55,7 @@ describe("contrast icon-button tokens", () => {
     )
 
     expect(tokens["v2-background-bg-icon-button-contrast"]).toBe("#dddddd")
-    expect(tokens["v2-background-bg-contrast"]).toBe("var(--v2-grey-700)")
+    expect(tokens["v2-background-bg-contrast"]).toBe("var(--v2-grey-100)")
   })
 })
 
