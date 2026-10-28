@@ -36,7 +36,7 @@ describe("lab model", () => {
     expect(lines.map((line) => line.depth)).toEqual([0, 1, 2, 1])
     expect(lines[1]?.best).toBe(true)
     expect(lines[1]?.delta).toBe("+10.0%")
-    expect(lines[2]?.delta).toBe("-5.0%")
+    expect(lines[2]?.delta).toBe("\u22125.0%")
     expect(lines[3]?.verdict).toBe("none")
     expect(lines[0]?.verdict).toBe("baseline")
   })
@@ -46,7 +46,7 @@ describe("lab model", () => {
     expect(deltaWords(0.3, 0.35, "Lower")).toBe("+5.0 pts")
     expect(deltaWords(129_326, 630, "Higher")).toBe("205×")
     expect(deltaWords(1, 4, "Higher")).toBe("÷4.0")
-    expect(deltaWords(1.2, 1, "Lower")).toBe("-20.0%")
+    expect(deltaWords(1.2, 1, "Lower")).toBe("\u221220.0%")
   })
 
   test("a parent cycle from a bad state file does not hang", () => {

@@ -134,7 +134,8 @@ export function deltaWords(value: number, parent: number, direction: Direction) 
   return `${signed((sign * (value - parent) * 100) / Math.abs(parent))}%`
 }
 
-const signed = (n: number) => `${n >= 0 ? "+" : ""}${n.toFixed(1)}`
+// A true minus (U+2212), the width of the plus, so a column of changes lines up and reads as typeset, not typed.
+const signed = (n: number) => `${n >= 0 ? "+" : "\u2212"}${Math.abs(n).toFixed(1)}`
 
 /** A value to four significant figures, so `72.90000000000001` reads `72.9`; an exponent past 1e6 or under 1e-4. */
 export function figure(value: number) {
