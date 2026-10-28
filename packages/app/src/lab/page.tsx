@@ -5,7 +5,7 @@ import { useLanguage } from "@/runtime/i18n/language"
 import { LabChart } from "./chart"
 import type { Experiment, Run, Study, Verb } from "./contract"
 import { ancestry, deltaWords, duration, figure, live, rows, valueOf } from "./model"
-import { Chip, ColumnHead, EDGE, FIGURES, Label, Node, Notice, ROW_TEXT, statusClass, Tile } from "./parts"
+import { Chip, ColumnHead, EDGE, FIGURES, Label, Node, Notice, READINGS, ROW_TEXT, statusClass, Tile } from "./parts"
 import type { PageTab } from "./state"
 
 const TABS: readonly PageTab[] = ["overview", "training", "evals", "rollouts", "log"]
@@ -101,30 +101,32 @@ export function LabPage(props: LabPageProps) {
         </span>
       </ColumnHead>
       <div class="min-h-0 flex-1 overflow-y-auto" data-scrollable data-slot="lab-page-body">
-        <div class={`flex flex-col gap-3 pb-3 ${EDGE}`} data-lab-rise>
-          <div class="flex flex-col gap-1">
-            <h2 class="text-20-medium text-v2-text-text-base [text-wrap:balance]">{props.experiment.title}</h2>
+        <div class={`flex flex-col gap-4 pb-4 ${EDGE}`}>
+          {/* Two tones, as Polar's headlines: what it is, then where it grew from, quieter, in one breath. */}
+          <h2 class="text-20-medium tracking-[-0.01em] text-v2-text-text-base [text-wrap:balance]">
+            {props.experiment.title}
             <Show when={parent()}>
               {(from) => (
-                <span class="text-13-regular text-v2-text-text-muted">
+                <span class="text-v2-text-text-faint">
+                  {" "}
                   {language.t("research.page.from", { id: from().id, title: from().title })}
                 </span>
               )}
             </Show>
-          </div>
+          </h2>
           <div class="flex flex-wrap items-center gap-1.5" data-slot="lab-page-chips">
             <span
               class="inline-flex h-5 items-center gap-1.5 rounded-[6px] border-[0.5px] px-1.5 text-[11px]"
               classList={{
                 "border-v2-state-border-success bg-v2-state-bg-success text-v2-state-fg-success": going(),
-                "border-v2-border-border-muted bg-v2-background-bg-layer-01": !going(),
+                "border-v2-border-border-base": !going(),
                 [statusClass(run()?.status)]: !going(),
               }}
             >
               <span class="size-1.5 rounded-full bg-current" classList={{ "opacity-60": !going() }} />
               {run() ? language.t(`research.status.${run()?.status ?? "Queued"}`) : language.t("research.page.unrun")}
               <Show when={run() && (run()?.millis ?? 0) > 0}>
-                <span class="font-mono tabular-nums opacity-80">{duration(run()?.millis ?? 0)}</span>
+                <span class="tabular-nums opacity-80">{duration(run()?.millis ?? 0)}</span>
               </Show>
             </span>
             <Chip mono>{props.experiment.branch}</Chip>
@@ -155,8 +157,11 @@ export function LabPage(props: LabPageProps) {
               </Button>
             </Show>
           </div>
-          <div class="grid grid-cols-2 gap-1.5 @[460px]:grid-cols-4" data-slot="lab-readings">
-            <Tile label={props.study?.metric ?? language.t("research.study.metric")} live={going()}>
+          <div
+            class={`${READINGS} grid-cols-[1.5fr_1fr_1fr_0.7fr] border-t border-v2-border-border-muted pt-3`}
+            data-slot="lab-readings"
+          >
+            <Tile label={props.study?.metric ?? language.t("research.study.metric")} live={going()} large>
               <span class="text-v2-text-text-base">{value() !== undefined ? figure(value() ?? 0) : "—"}</span>
               <Show when={going()}>
                 <span class="basis-full font-sans text-[11px] leading-4 text-v2-state-fg-success">
@@ -261,7 +266,7 @@ function Overview(props: LabPageProps) {
         {(run) => (
           <div data-slot="lab-overview-chart">
             <div class="flex items-baseline justify-between gap-3 pb-1">
-              <span class="text-13-medium text-v2-text-text-base">{language.t("research.page.curve")}</span>
+              <span class="text-12-medium text-v2-text-text-muted">{language.t("research.page.curve")}</span>
               <span class="truncate font-mono text-[11px] text-v2-text-text-faint">
                 {props.study?.metric} · {language.t("research.page.ofRun", { run: run().number })}
               </span>
@@ -331,7 +336,7 @@ function Overview(props: LabPageProps) {
       <Show when={props.experiment.command.trim()}>
         <div data-slot="lab-command">
           <Label>{language.t("research.page.command")}</Label>
-          <code class="block overflow-x-auto whitespace-pre rounded-[8px] border-[0.5px] border-v2-border-border-muted bg-v2-background-bg-layer-01 px-2.5 py-2 text-12-mono text-v2-text-text-base">
+          <code class="block overflow-x-auto whitespace-pre rounded-[8px] bg-v2-background-bg-layer-02 px-2.5 py-2 text-12-mono text-v2-text-text-base">
             <span class="select-none text-v2-text-text-faint">$ </span>
             {props.experiment.command}
           </code>
@@ -345,7 +350,7 @@ function Overview(props: LabPageProps) {
       </Show>
       <Show when={valueOf(props.experiment) === undefined && props.experiment.runs.at(-1)?.error}>
         {(error) => (
-          <div class="rounded-[8px] border-[0.5px] border-v2-state-border-danger bg-v2-state-bg-danger px-2.5 py-2 text-12-mono text-v2-state-fg-danger [overflow-wrap:anywhere]">
+          <div class="rounded-[8px] bg-v2-state-bg-danger px-2.5 py-2 text-12-mono text-v2-state-fg-danger [overflow-wrap:anywhere]">
             {error()}
           </div>
         )}
@@ -425,11 +430,11 @@ function Training(props: { experiment: Experiment; parent: Experiment | undefine
           <Show when={runs().length > 1}>
             <div>
               <Label>{language.t("research.training.runs")}</Label>
-              <div class="grid grid-cols-1 gap-2 @[460px]:grid-cols-2">
+              <div class="grid grid-cols-1 gap-x-4 gap-y-3 @[460px]:grid-cols-2">
                 <For each={runs()}>
                   {(each) => (
-                    <div class="rounded-[10px] border-[0.5px] border-v2-border-border-muted bg-v2-background-bg-layer-01 px-2 pb-1 pt-2">
-                      <div class="flex items-baseline justify-between gap-2 px-1 font-mono text-[11px] tabular-nums">
+                    <div class="border-t border-v2-border-border-muted pt-2">
+                      <div class="flex items-baseline justify-between gap-2 text-[11px] tabular-nums">
                         <span class="text-v2-text-text-faint">#{each.number}</span>
                         <span class={each.status === "Running" ? "text-v2-state-fg-success" : "text-v2-text-text-base"}>
                           {each.value !== null ? figure(each.value) : ""}
@@ -530,7 +535,7 @@ function Log(props: { experiment: Experiment; log: (id: number) => Promise<strin
                     {(part) => <span classList={{ "text-v2-text-text-base": part.number }}>{part.text}</span>}
                   </For>
                   <Show when={live(props.experiment) && index() === lines().length - 1}>
-                    <span class="ms-1 inline-block h-3 w-1.5 translate-y-0.5 bg-v2-state-fg-success" data-lab-blink />
+                    <span class="ms-1 inline-block h-3 w-1.5 translate-y-0.5 bg-v2-state-fg-success" />
                   </Show>
                 </span>
               </>

@@ -8,13 +8,14 @@ import type { RunStatus } from "./contract"
 /*
  * The Lab's type and grid. Every block keeps one 12px inline edge, so the goal, the tree's nodes, the page's title and
  * every right-aligned number share vertical lines. 14px medium names things, 13px on the compact 16px line reads rows,
- * 12px carries meta, and every number is the code font with tabular figures so columns hold still while a run writes.
+ * 12px carries meta. Numbers are the interface face with tabular figures, as Linear and Polar set theirs, so columns
+ * hold still while a run writes; the code face is kept for code: branches, commits, commands and logs.
  */
 export const EDGE = "px-3"
 
 export const ROW_TEXT = "text-[13px] leading-[var(--line-height-compact)]"
 
-export const FIGURES = "text-12-mono tabular-nums"
+export const FIGURES = "text-[12px] leading-[var(--line-height-compact)] tabular-nums"
 
 /** Colour means state: green is live, warning is waiting, danger is failure, grey is everything else. */
 export function statusClass(status: RunStatus | undefined) {
@@ -93,14 +94,14 @@ export function Label(props: { children: JSX.Element }) {
   return <div class="pb-1 text-12-medium text-v2-text-text-muted">{props.children}</div>
 }
 
-/** A reading: its label, then its figures in the code face, on the raised layer with a hairline. */
-export function Tile(props: { label: string; live?: boolean; children: JSX.Element }) {
+/**
+ * A reading, as Linear's insights and Polar's dashboards set one: a quiet label over a figure, no box. Readings in a
+ * row are parted by a hairline, so depth stays the panel's alone.
+ */
+export function Tile(props: { label: string; live?: boolean; large?: boolean; children: JSX.Element }) {
   return (
-    <div
-      class="flex min-w-0 flex-col rounded-[10px] border-[0.5px] border-v2-border-border-muted bg-v2-background-bg-layer-01 px-2.5 py-2"
-      data-slot="lab-tile"
-    >
-      <span class="flex items-center gap-1.5 truncate text-[11px] leading-4 text-v2-text-text-faint">
+    <div class="flex min-w-0 flex-col gap-0.5 px-3 first:ps-0 last:pe-0" data-slot="lab-tile">
+      <span class="flex items-center gap-1.5 truncate text-[11px] font-medium leading-4 text-v2-text-text-faint">
         <Show when={props.live}>
           <span class="relative flex size-1.5">
             <span class="absolute inset-0 rounded-full bg-v2-state-fg-success" data-lab-pulse />
@@ -109,19 +110,25 @@ export function Tile(props: { label: string; live?: boolean; children: JSX.Eleme
         </Show>
         {props.label}
       </span>
-      <span class={`flex min-w-0 flex-wrap items-baseline gap-x-1.5 font-mono text-[15px] leading-6 tabular-nums`}>
+      <span
+        class="flex min-w-0 flex-wrap items-baseline gap-x-1.5 font-medium tabular-nums tracking-[-0.01em]"
+        classList={{ "text-[26px] leading-8": props.large, "text-[16px] leading-6": !props.large }}
+      >
         {props.children}
       </span>
     </div>
   )
 }
 
-/** A study parameter as a quiet pill, as ArkenOS lists a design's inputs under its title. */
+/** The row readings sit in: equal columns parted by hairlines. */
+export const READINGS = "grid divide-x divide-v2-border-border-muted"
+
+/** A study parameter as a quiet pill: a hairline, no fill, so it reads as a label rather than a control. */
 export function Chip(props: { mono?: boolean; children: JSX.Element }) {
   return (
     <span
-      class="inline-flex h-5 max-w-full items-center truncate rounded-[6px] border-[0.5px] border-v2-border-border-muted bg-v2-background-bg-layer-01 px-1.5 text-[11px] text-v2-text-text-muted"
-      classList={{ "font-mono tabular-nums": props.mono }}
+      class="inline-flex h-5 max-w-full items-center truncate rounded-[6px] border-[0.5px] border-v2-border-border-base px-1.5 text-[11px] text-v2-text-text-muted"
+      classList={{ "font-mono": props.mono }}
     >
       {props.children}
     </span>

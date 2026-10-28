@@ -1,4 +1,4 @@
-import { createMemo, createSignal, createUniqueId, For, Show } from "solid-js"
+import { createMemo, createSignal, For, Show } from "solid-js"
 import { createElementSize } from "@solid-primitives/resize-observer"
 import type { Direction } from "./model"
 import { figure, ticks } from "./model"
@@ -42,7 +42,6 @@ export function LabChart(props: ChartProps) {
   const [box, setBox] = createSignal<HTMLDivElement>()
   const size = createElementSize(box)
   const [hover, setHover] = createSignal<number>()
-  const fill = createUniqueId()
 
   const width = () => Math.max(size.width ?? 0, LEFT + RIGHT + 40)
 
@@ -64,14 +63,6 @@ export function LabChart(props: ChartProps) {
 
   const line = (points: readonly number[]) =>
     points.map((value, index) => `${index === 0 ? "M" : "L"}${x(index).toFixed(1)},${y(value).toFixed(1)}`).join("")
-
-  const area = () => {
-    const points = props.points
-
-    if (points.length < 2) return ""
-
-    return `${line(points)}L${x(points.length - 1).toFixed(1)},${props.height - BOTTOM}L${LEFT},${props.height - BOTTOM}Z`
-  }
 
   // A small chart is a glance: two values on its axis and no words on its target.
   const small = () => props.height < 150
@@ -99,12 +90,6 @@ export function LabChart(props: ChartProps) {
 
     return value === undefined ? undefined : { index: props.points.length - 1, value }
   }
-
-  const met = () =>
-    props.target != null &&
-    props.points.some((value) =>
-      props.direction === "Higher" ? value >= (props.target ?? 0) : value <= (props.target ?? 0),
-    )
 
   const onMove = (event: PointerEvent) => {
     const rect = box()?.getBoundingClientRect()
@@ -137,12 +122,6 @@ export function LabChart(props: ChartProps) {
           onPointerLeave={() => setHover(undefined)}
           aria-hidden="true"
         >
-          <defs>
-            <linearGradient id={fill} x1="0" x2="0" y1="0" y2="1">
-              <stop offset="0%" stop-color="var(--v2-text-text-base)" stop-opacity="0.16" />
-              <stop offset="100%" stop-color="var(--v2-text-text-base)" stop-opacity="0" />
-            </linearGradient>
-          </defs>
           <For each={valueTicks()}>
             {(tick) => (
               <>
@@ -159,7 +138,7 @@ export function LabChart(props: ChartProps) {
                   y={y(tick)}
                   dy="0.32em"
                   text-anchor="end"
-                  class="fill-v2-text-text-faint font-mono text-[10px] tabular-nums"
+                  class="fill-v2-text-text-faint text-[10px] tabular-nums"
                 >
                   {figure(tick)}
                 </text>
@@ -172,7 +151,7 @@ export function LabChart(props: ChartProps) {
                 x={x(tick)}
                 y={props.height - 6}
                 text-anchor="middle"
-                class="fill-v2-text-text-faint font-mono text-[10px] tabular-nums"
+                class="fill-v2-text-text-faint text-[10px] tabular-nums"
               >
                 {tick}
               </text>
@@ -186,21 +165,18 @@ export function LabChart(props: ChartProps) {
               y2={y(props.target ?? 0)}
               stroke-dasharray="5 4"
               stroke-width="1"
-              class={met() ? "stroke-v2-state-fg-success" : "stroke-v2-text-text-faint"}
-              opacity={met() ? 0.7 : 1}
+              class="stroke-v2-text-text-faint"
             />
             <text
               display={small() ? "none" : undefined}
               x={LEFT + 6}
               y={y(props.target ?? 0) - 6}
               text-anchor="start"
-              class="font-mono text-[10px] tabular-nums"
-              classList={{ "fill-v2-state-fg-success": met(), "fill-v2-text-text-faint": !met() }}
+              class="fill-v2-text-text-faint text-[10px] tabular-nums"
             >
               target {figure(props.target ?? 0)}
             </text>
           </Show>
-          <path d={area()} fill={`url(#${fill})`} data-lab-fade />
           <Show when={props.parent && props.parent.length > 1}>
             <path
               d={line(props.parent ?? [])}
@@ -217,12 +193,10 @@ export function LabChart(props: ChartProps) {
             stroke-linejoin="round"
             stroke-linecap="round"
             class="stroke-v2-text-text-base"
-            pathLength="1"
-            data-lab-draw
           />
           <Show when={peak()}>
             {(top) => (
-              <g data-lab-fade style={{ "animation-delay": "700ms" }}>
+              <g>
                 <line
                   x1={x(top().index)}
                   x2={x(top().index)}
@@ -236,7 +210,7 @@ export function LabChart(props: ChartProps) {
                   x={x(top().index) + (x(top().index) > width() * 0.7 ? -6 : 6)}
                   y={TOP + 4}
                   text-anchor={x(top().index) > width() * 0.7 ? "end" : "start"}
-                  class="fill-v2-text-text-base font-mono text-[10px] font-medium tabular-nums"
+                  class="fill-v2-text-text-base text-[10px] font-medium tabular-nums"
                 >
                   {figure(top().value)}
                   <tspan class="fill-v2-text-text-faint"> peak @ {top().index}</tspan>
@@ -246,7 +220,7 @@ export function LabChart(props: ChartProps) {
           </Show>
           <Show when={end()}>
             {(last) => (
-              <g data-lab-fade style={{ "animation-delay": "800ms" }}>
+              <g>
                 <Show when={props.live}>
                   <circle
                     cx={x(last().index)}
@@ -308,17 +282,17 @@ export function LabChart(props: ChartProps) {
               }}
               data-slot="lab-chart-readout"
             >
-              <span class="font-mono text-[10px] tabular-nums text-v2-text-text-faint">step {at().index}</span>
+              <span class="text-[11px] tabular-nums text-v2-text-text-faint">step {at().index}</span>
               <Show when={at().value !== undefined}>
                 <span class="flex items-baseline justify-between gap-4 text-12-regular text-v2-text-text-muted">
                   {props.metric}
-                  <span class="font-mono tabular-nums text-v2-text-text-base">{figure(at().value ?? 0)}</span>
+                  <span class="tabular-nums text-v2-text-text-base">{figure(at().value ?? 0)}</span>
                 </span>
               </Show>
               <Show when={at().before !== undefined}>
                 <span class="flex items-baseline justify-between gap-4 text-12-regular text-v2-text-text-faint">
                   {props.parentName ?? "parent"}
-                  <span class="font-mono tabular-nums">{figure(at().before ?? 0)}</span>
+                  <span class="tabular-nums">{figure(at().before ?? 0)}</span>
                 </span>
               </Show>
             </div>

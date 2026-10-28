@@ -139,18 +139,6 @@ export function LabMap(props: {
 
   const valueTicks = createMemo(() => ticks(domain().low, domain().high, 3))
 
-  const met = () => {
-    const id = top()
-    const experiment = props.all.find((each) => each.id === id)
-    const value = experiment && valueOf(experiment)
-
-    return (
-      props.study.target !== null &&
-      value !== undefined &&
-      (higher() ? value >= props.study.target : value <= props.study.target)
-    )
-  }
-
   // Called out by name: the best, every live run, the picked one and the one under the pointer.
   const callouts = createMemo(() => {
     const ids = new Set<number>()
@@ -186,7 +174,7 @@ export function LabMap(props: {
                 y={y(tick)}
                 dy="0.32em"
                 text-anchor="end"
-                class="fill-v2-text-text-faint font-mono text-[10px] tabular-nums"
+                class="fill-v2-text-text-faint text-[10px] tabular-nums"
               >
                 {figure(tick)}
               </text>
@@ -204,7 +192,7 @@ export function LabMap(props: {
             y={props.height - FLOOR / 2 - 4}
             dy="0.32em"
             text-anchor="end"
-            class="fill-v2-text-text-faint font-mono text-[10px]"
+            class="fill-v2-text-text-faint text-[10px]"
           >
             none
           </text>
@@ -215,15 +203,13 @@ export function LabMap(props: {
               y1={y(props.study.target ?? 0)}
               y2={y(props.study.target ?? 0)}
               stroke-dasharray="5 4"
-              class={met() ? "stroke-v2-state-fg-success" : "stroke-v2-text-text-faint"}
-              opacity={met() ? 0.65 : 1}
+              class="stroke-v2-text-text-faint"
             />
             <text
               x={LEFT}
               y={y(props.study.target ?? 0) - 6}
               text-anchor="start"
-              class="font-mono text-[10px] tabular-nums"
-              classList={{ "fill-v2-state-fg-success": met(), "fill-v2-text-text-faint": !met() }}
+              class="fill-v2-text-text-faint text-[10px] tabular-nums"
             >
               target {figure(props.study.target ?? 0)}
             </text>
@@ -242,7 +228,6 @@ export function LabMap(props: {
                   y2={toY()}
                   class="stroke-v2-border-border-strong"
                   stroke-width="1"
-                  data-lab-fade
                 />
               )
             }}
@@ -262,20 +247,17 @@ export function LabMap(props: {
                       : "stroke-v2-border-border-strong"
                 }
                 opacity={edge.down ? 0.5 : edge.lit || edge.live ? 0.9 : 0.8}
-                pathLength={edge.live ? undefined : 1}
-                data-lab-draw={edge.live ? undefined : ""}
-                data-lab-flow={edge.live ? "" : undefined}
-                style={{ "animation-delay": edge.live ? undefined : `${index() * 60}ms` }}
+                // Still running: dashed, as a value not yet settled.
+                stroke-dasharray={edge.live ? "3 3" : undefined}
               />
             )}
           </For>
           <For each={[...places().values()]}>
-            {(place, index) => (
+            {(place) => (
               <Node
                 place={place}
                 best={place.row.experiment.id === top()}
                 picked={place.row.experiment.id === props.picked}
-                delay={200 + index() * 60}
               />
             )}
           </For>
@@ -314,12 +296,12 @@ export function LabMap(props: {
   )
 }
 
-function Node(props: { place: Place; best: boolean; picked: boolean; delay: number }) {
+function Node(props: { place: Place; best: boolean; picked: boolean }) {
   const status = () => props.place.row.experiment.runs.at(-1)?.status
   const failed = () => status() === "Failed" || status() === "Lost"
 
   return (
-    <g data-lab-fade style={{ "animation-delay": `${props.delay}ms` }}>
+    <g>
       <Show when={props.picked}>
         <circle
           cx={props.place.x}
@@ -404,20 +386,19 @@ function Callout(props: { place: Place; left: number; top: number; best: boolean
 
   return (
     <div
-      class="pointer-events-none absolute z-10 flex flex-col rounded-[8px] border-[0.5px] bg-v2-background-bg-base/90 px-2 py-1 shadow-[var(--v2-elevation-floating)] backdrop-blur-sm"
+      class="pointer-events-none absolute z-10 flex flex-col rounded-[8px] border-[0.5px] bg-v2-background-bg-base px-2 py-1 shadow-[var(--v2-elevation-floating)]"
       classList={{
         "border-v2-border-border-strong": props.picked,
         "border-v2-border-border-base": !props.picked,
       }}
       style={{ left: `${props.left}px`, top: `${props.top}px`, width: `${CARD_W}px` }}
-      data-lab-rise
       data-slot="lab-map-callout"
     >
       <span class="flex min-w-0 items-baseline gap-1.5 text-[11px] leading-4">
-        <span class="shrink-0 font-mono tabular-nums text-v2-text-text-faint">#{experiment().id}</span>
+        <span class="shrink-0 tabular-nums text-v2-text-text-faint">#{experiment().id}</span>
         <span class="min-w-0 truncate text-v2-text-text-base">{experiment().title}</span>
       </span>
-      <span class="flex items-baseline gap-2 font-mono text-[11px] leading-4 tabular-nums">
+      <span class="flex items-baseline gap-2 text-[11px] leading-4 tabular-nums">
         <Show
           when={props.place.value !== undefined}
           fallback={

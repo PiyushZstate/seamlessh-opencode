@@ -4,7 +4,7 @@ import { useLanguage } from "@/runtime/i18n/language"
 import type { Experiment, Snapshot, Study } from "./contract"
 import { best, duration, figure, reached, rows, valueOf, type Row } from "./model"
 import { LabMap } from "./map"
-import { Chip, ColumnHead, EDGE, FIGURES, Node, Notice, ROW_TEXT, statusClass, Tile } from "./parts"
+import { Chip, ColumnHead, EDGE, FIGURES, Node, Notice, READINGS, ROW_TEXT, statusClass, Tile } from "./parts"
 import type { LabState } from "./state"
 
 export type LabTreeProps = {
@@ -136,7 +136,7 @@ function Strip(props: { study: Study; all: readonly Experiment[]; running: Exper
   return (
     <div class={`flex shrink-0 flex-col gap-3 pb-3 ${EDGE}`} data-slot="lab-study">
       <Show when={props.study.goal.trim()}>
-        <div class="line-clamp-3 text-14-medium text-v2-text-text-base [text-wrap:pretty]">
+        <div class="line-clamp-3 text-14-medium text-v2-text-text-base [text-wrap:balance]">
           {props.study.goal.trim()}
         </div>
       </Show>
@@ -144,7 +144,7 @@ function Strip(props: { study: Study; all: readonly Experiment[]; running: Exper
         <Chip mono>{props.study.metric}</Chip>
         <Chip>{language.t(`research.direction.${props.study.direction}`)}</Chip>
       </div>
-      <div class="grid grid-cols-3 gap-1.5">
+      <div class={`${READINGS} grid-cols-3 pt-1`}>
         <Tile label={language.t("research.study.best")}>
           <span class="text-v2-text-text-base">{value() !== undefined ? figure(value() ?? 0) : "—"}</span>
           <span class="text-v2-text-text-faint">{top() ? `#${top()?.id}` : ""}</span>
@@ -196,7 +196,7 @@ function TreeRow(props: { line: Row; picked: boolean; onPick: () => void }) {
       type="button"
       role="option"
       aria-selected={props.picked}
-      class="relative flex h-7 w-full items-center gap-2 rounded-md pe-1.5 text-start hover:bg-v2-overlay-simple-overlay-hover"
+      class="relative flex h-7 w-full items-center gap-2 rounded-md pe-1.5 text-start outline-none transition-[background-color] duration-100 hover:bg-v2-overlay-simple-overlay-hover focus-visible:ring-1 focus-visible:ring-v2-border-border-focus"
       classList={{ "bg-v2-background-bg-layer-02": props.picked }}
       // The node's slot starts on the column's 12px edge at depth 0; each level steps 16px, one node and its gap.
       style={{ "padding-inline-start": `${6 + props.line.depth * 16}px` }}
