@@ -221,15 +221,6 @@ export function LabChart(props: ChartProps) {
           <Show when={end()}>
             {(last) => (
               <g>
-                <Show when={props.live}>
-                  <circle
-                    cx={x(last().index)}
-                    cy={y(last().value)}
-                    r="3.5"
-                    class="fill-v2-state-fg-success"
-                    data-lab-pulse
-                  />
-                </Show>
                 <circle
                   cx={x(last().index)}
                   cy={y(last().value)}
@@ -275,12 +266,13 @@ export function LabChart(props: ChartProps) {
         <Show when={readout()}>
           {(at) => (
             <div
-              class="pointer-events-none absolute top-1 z-10 flex min-w-32 flex-col gap-0.5 rounded-[8px] border-[0.5px] border-v2-border-border-base bg-v2-background-bg-base px-2.5 py-1.5 shadow-[var(--v2-elevation-floating)]"
+              class="pointer-events-none absolute top-1 z-10 flex min-w-32 flex-col gap-0.5 rounded-[10px] border-[0.5px] border-v2-border-border-base px-2.5 py-1.5 shadow-[var(--v2-elevation-floating)]"
               style={{
                 left: at().flip ? undefined : `${at().left + 10}px`,
                 right: at().flip ? `${width() - at().left + 10}px` : undefined,
               }}
               data-slot="lab-chart-readout"
+              data-lab-material
             >
               <span class="text-[11px] tabular-nums text-v2-text-text-faint">step {at().index}</span>
               <Show when={at().value !== undefined}>

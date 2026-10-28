@@ -103,16 +103,17 @@ export function Tile(props: { label: string; live?: boolean; large?: boolean; ch
     <div class="flex min-w-0 flex-col gap-0.5 px-3 first:ps-0 last:pe-0" data-slot="lab-tile">
       <span class="flex items-center gap-1.5 truncate text-[11px] font-medium leading-4 text-v2-text-text-faint">
         <Show when={props.live}>
-          <span class="relative flex size-1.5">
-            <span class="absolute inset-0 rounded-full bg-v2-state-fg-success" data-lab-pulse />
-            <span class="relative size-1.5 rounded-full bg-v2-state-fg-success" />
-          </span>
+          <span class="size-1.5 rounded-full bg-v2-state-fg-success" />
         </Show>
         {props.label}
       </span>
       <span
-        class="flex min-w-0 flex-wrap items-baseline gap-x-1.5 font-medium tabular-nums tracking-[-0.01em]"
-        classList={{ "text-[26px] leading-8": props.large, "text-[16px] leading-6": !props.large }}
+        class="flex min-w-0 flex-wrap items-baseline gap-x-1.5 tabular-nums"
+        // Tracking and leading tighten as the size grows, as Apple's type ramps do.
+        classList={{
+          "text-[28px] font-semibold leading-[1.1] tracking-[-0.02em]": props.large,
+          "text-[15px] font-medium leading-6 tracking-[-0.01em]": !props.large,
+        }}
       >
         {props.children}
       </span>
@@ -122,15 +123,3 @@ export function Tile(props: { label: string; live?: boolean; large?: boolean; ch
 
 /** The row readings sit in: equal columns parted by hairlines. */
 export const READINGS = "grid divide-x divide-v2-border-border-muted"
-
-/** A study parameter as a quiet pill: a hairline, no fill, so it reads as a label rather than a control. */
-export function Chip(props: { mono?: boolean; children: JSX.Element }) {
-  return (
-    <span
-      class="inline-flex h-5 max-w-full items-center truncate rounded-[6px] border-[0.5px] border-v2-border-border-base px-1.5 text-[11px] text-v2-text-text-muted"
-      classList={{ "font-mono": props.mono }}
-    >
-      {props.children}
-    </span>
-  )
-}

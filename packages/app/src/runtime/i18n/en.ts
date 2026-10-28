@@ -1299,7 +1299,6 @@ export const dict = {
   "research.tab.rollouts": "Rollouts",
   "research.tab.log": "Log",
   "research.page.from": "from #{{id}} {{title}}",
-  "research.page.climb": "Climb",
   "research.page.note": "Note",
   "research.page.command": "Command",
   "research.page.runs": "Runs",

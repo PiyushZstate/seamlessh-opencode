@@ -4,7 +4,7 @@ import { useLanguage } from "@/runtime/i18n/language"
 import type { Experiment, Snapshot, Study } from "./contract"
 import { best, duration, figure, reached, rows, valueOf, type Row } from "./model"
 import { LabMap } from "./map"
-import { Chip, ColumnHead, EDGE, FIGURES, Node, Notice, READINGS, ROW_TEXT, statusClass, Tile } from "./parts"
+import { ColumnHead, EDGE, FIGURES, Node, Notice, READINGS, ROW_TEXT, statusClass, Tile } from "./parts"
 import type { LabState } from "./state"
 
 export type LabTreeProps = {
@@ -56,6 +56,7 @@ function Research(props: LabTreeProps & { snapshot: Snapshot }) {
   const language = useLanguage()
   const direction = () => props.snapshot.study?.direction ?? "Higher"
   const lines = createMemo(() => rows(props.snapshot.experiments, direction()))
+  const pickedRow = () => lines().findIndex((line) => line.experiment.id === props.picked)
 
   return (
     <>
@@ -80,12 +81,23 @@ function Research(props: LabTreeProps & { snapshot: Snapshot }) {
         fallback={<Notice title={language.t("research.empty.title")} body={language.t("research.empty.body")} />}
       >
         <div
-          class="min-h-0 flex-1 overflow-y-auto px-1.5 pb-3 pt-1.5"
+          class="relative min-h-0 flex-1 overflow-y-auto px-1.5 pb-4 pt-2"
           data-scrollable
           data-slot="lab-tree"
+          data-lab-fade-edges
           role="listbox"
           aria-label={language.t("research.tree.title")}
         >
+          {/* One highlight for the pick, gliding from row to row rather than jumping (Apple: spatial continuity). */}
+          <div
+            aria-hidden="true"
+            class="pointer-events-none absolute inset-x-1.5 top-2 h-7 rounded-md bg-v2-background-bg-layer-02"
+            style={{
+              transform: `translateY(${Math.max(0, pickedRow()) * ROW_HEIGHT}px)`,
+              opacity: pickedRow() < 0 ? 0 : 1,
+            }}
+            data-lab-glide
+          />
           <For each={lines()}>
             {(line) => (
               <TreeRow
@@ -100,6 +112,9 @@ function Research(props: LabTreeProps & { snapshot: Snapshot }) {
     </>
   )
 }
+
+/** A row's height, which the gliding highlight steps by. */
+const ROW_HEIGHT = 28
 
 /** The map's height: tall enough that a few points of accuracy read as a climb. */
 const MAP_HEIGHT = 280
@@ -136,13 +151,14 @@ function Strip(props: { study: Study; all: readonly Experiment[]; running: Exper
   return (
     <div class={`flex shrink-0 flex-col gap-3 pb-3 ${EDGE}`} data-slot="lab-study">
       <Show when={props.study.goal.trim()}>
-        <div class="line-clamp-3 text-14-medium text-v2-text-text-base [text-wrap:balance]">
+        <div class="line-clamp-3 text-[15px] font-semibold leading-5 tracking-[-0.01em] text-v2-text-text-base [text-wrap:balance]">
           {props.study.goal.trim()}
         </div>
       </Show>
-      <div class="flex flex-wrap items-center gap-1.5">
-        <Chip mono>{props.study.metric}</Chip>
-        <Chip>{language.t(`research.direction.${props.study.direction}`)}</Chip>
+      <div class="flex flex-wrap items-center gap-x-2 text-12-regular text-v2-text-text-muted">
+        <span class="font-mono text-[11px]">{props.study.metric}</span>
+        <span class="text-v2-text-text-faint">·</span>
+        <span>{language.t(`research.direction.${props.study.direction}`)}</span>
       </div>
       <div class={`${READINGS} grid-cols-3 pt-1`}>
         <Tile label={language.t("research.study.best")}>
@@ -196,8 +212,8 @@ function TreeRow(props: { line: Row; picked: boolean; onPick: () => void }) {
       type="button"
       role="option"
       aria-selected={props.picked}
-      class="relative flex h-7 w-full items-center gap-2 rounded-md pe-1.5 text-start outline-none transition-[background-color] duration-100 hover:bg-v2-overlay-simple-overlay-hover focus-visible:ring-1 focus-visible:ring-v2-border-border-focus"
-      classList={{ "bg-v2-background-bg-layer-02": props.picked }}
+      // Hover washes, a press answers on pointer-down; the pick itself is the gliding highlight behind the rows.
+      class="relative flex h-7 w-full items-center gap-2 rounded-md pe-1.5 text-start outline-none transition-[background-color] duration-100 hover:bg-v2-overlay-simple-overlay-hover active:bg-v2-overlay-simple-overlay-pressed active:duration-0 focus-visible:ring-1 focus-visible:ring-v2-border-border-focus"
       // The node's slot starts on the column's 12px edge at depth 0; each level steps 16px, one node and its gap.
       style={{ "padding-inline-start": `${6 + props.line.depth * 16}px` }}
       onClick={() => props.onPick()}

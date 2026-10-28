@@ -138,6 +138,7 @@ export function LabMap(props: {
   )
 
   const valueTicks = createMemo(() => ticks(domain().low, domain().high, 3))
+  const picked = () => (props.picked === undefined ? undefined : places().get(props.picked))
 
   // Called out by name: the best, every live run, the picked one and the one under the pointer.
   const callouts = createMemo(() => {
@@ -214,24 +215,6 @@ export function LabMap(props: {
               target {figure(props.study.target ?? 0)}
             </text>
           </Show>
-          <For each={callouts()}>
-            {(card) => {
-              // From the node to the card's nearest edge, so a card set aside still points at its node.
-              const toX = () => Math.min(Math.max(card.place.x, card.left), card.left + CARD_W)
-              const toY = () => Math.min(Math.max(card.place.y, card.top), card.top + CARD_H)
-
-              return (
-                <line
-                  x1={card.place.x}
-                  y1={card.place.y}
-                  x2={toX()}
-                  y2={toY()}
-                  class="stroke-v2-border-border-strong"
-                  stroke-width="1"
-                />
-              )
-            }}
-          </For>
           <For each={edges()}>
             {(edge, index) => (
               <path
@@ -252,6 +235,18 @@ export function LabMap(props: {
               />
             )}
           </For>
+          {/* One ring for the pick, carried from node to node so the eye follows it (Apple: spatial continuity). */}
+          <circle
+            r="9.5"
+            fill="none"
+            class="stroke-v2-text-text-base"
+            stroke-width="1.25"
+            style={{
+              transform: `translate(${picked()?.x ?? 0}px, ${picked()?.y ?? 0}px)`,
+              opacity: picked() ? 1 : 0,
+            }}
+            data-lab-glide
+          />
           <For each={[...places().values()]}>
             {(place) => (
               <Node
@@ -267,7 +262,7 @@ export function LabMap(props: {
           {(place) => (
             <button
               type="button"
-              class="absolute size-6 -translate-x-1/2 -translate-y-1/2 rounded-full outline-none focus-visible:ring-1 focus-visible:ring-v2-border-border-focus"
+              class="absolute size-6 -translate-x-1/2 -translate-y-1/2 rounded-full outline-none active:bg-v2-overlay-simple-overlay-pressed focus-visible:ring-1 focus-visible:ring-v2-border-border-focus"
               style={{ left: `${place.x}px`, top: `${place.y}px` }}
               aria-label={`#${place.row.experiment.id} ${place.row.experiment.title}`}
               aria-pressed={place.row.experiment.id === props.picked}
@@ -282,13 +277,7 @@ export function LabMap(props: {
         </For>
         <For each={callouts()}>
           {(card) => (
-            <Callout
-              place={card.place}
-              left={card.left}
-              top={card.top}
-              best={card.place.row.experiment.id === top()}
-              picked={card.place.row.experiment.id === props.picked}
-            />
+            <Callout place={card.place} left={card.left} top={card.top} best={card.place.row.experiment.id === top()} />
           )}
         </For>
       </Show>
@@ -302,16 +291,6 @@ function Node(props: { place: Place; best: boolean; picked: boolean }) {
 
   return (
     <g>
-      <Show when={props.picked}>
-        <circle
-          cx={props.place.x}
-          cy={props.place.y}
-          r="9.5"
-          fill="none"
-          class="stroke-v2-text-text-base"
-          stroke-width="1.25"
-        />
-      </Show>
       <Show when={props.place.row.experiment.kept && !props.picked}>
         <circle
           cx={props.place.x}
@@ -323,7 +302,6 @@ function Node(props: { place: Place; best: boolean; picked: boolean }) {
         />
       </Show>
       <Show when={props.place.kind === "live"}>
-        <circle cx={props.place.x} cy={props.place.y} r="4.5" class="fill-v2-state-fg-success" data-lab-pulse />
         <circle cx={props.place.x} cy={props.place.y} r="4.5" class="fill-v2-state-fg-success" />
       </Show>
       <Show when={props.place.kind === "queued"}>
@@ -371,7 +349,7 @@ function Node(props: { place: Place; best: boolean; picked: boolean }) {
 }
 
 /** A node's name card, as ArkenOS pins its readings to the model: id and title, then the value and the change. */
-function Callout(props: { place: Place; left: number; top: number; best: boolean; picked: boolean }) {
+function Callout(props: { place: Place; left: number; top: number; best: boolean }) {
   const experiment = () => props.place.row.experiment
 
   const tone = () => {
@@ -384,28 +362,25 @@ function Callout(props: { place: Place; left: number; top: number; best: boolean
     return "text-v2-text-text-faint"
   }
 
+  // A label set straight on the map, as Stocks and Health annotate their charts: no card, a halo for legibility.
   return (
     <div
-      class="pointer-events-none absolute z-10 flex flex-col rounded-[8px] border-[0.5px] bg-v2-background-bg-base px-2 py-1 shadow-[var(--v2-elevation-floating)]"
-      classList={{
-        "border-v2-border-border-strong": props.picked,
-        "border-v2-border-border-base": !props.picked,
-      }}
+      class="pointer-events-none absolute z-10 flex flex-col"
       style={{ left: `${props.left}px`, top: `${props.top}px`, width: `${CARD_W}px` }}
       data-slot="lab-map-callout"
+      data-lab-halo
     >
-      <span class="flex min-w-0 items-baseline gap-1.5 text-[11px] leading-4">
-        <span class="shrink-0 tabular-nums text-v2-text-text-faint">#{experiment().id}</span>
-        <span class="min-w-0 truncate text-v2-text-text-base">{experiment().title}</span>
+      <span class="min-w-0 truncate text-[11px] font-medium leading-[14px] text-v2-text-text-base">
+        {experiment().title}
       </span>
-      <span class="flex items-baseline gap-2 text-[11px] leading-4 tabular-nums">
+      <span class="flex items-baseline gap-1.5 text-[11px] leading-[14px] tabular-nums">
         <Show
           when={props.place.value !== undefined}
           fallback={
             <span class="text-v2-text-text-faint">{experiment().runs.at(-1)?.status.toLowerCase() ?? "no runs"}</span>
           }
         >
-          <span class="text-v2-text-text-base">{figure(props.place.value ?? 0)}</span>
+          <span class="text-v2-text-text-muted">{figure(props.place.value ?? 0)}</span>
         </Show>
         <Show when={props.place.kind === "live"}>
           <span class="text-v2-state-fg-success">live</span>
@@ -421,9 +396,9 @@ function Callout(props: { place: Place; left: number; top: number; best: boolean
   )
 }
 
-const CARD_W = 168
+const CARD_W = 150
 
-const CARD_H = 38
+const CARD_H = 30
 
 /**
  * Where each name card goes: beside its node, on the first of four corners that stays on the map and clear of the

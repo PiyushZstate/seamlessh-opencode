@@ -1,28 +1,80 @@
 /*
- * The Lab's one motion: a live run's newest value breathes, because it is still changing. Picking, tab switches and
- * polls redraw at once, as frequent actions should; under reduced motion the pulse is not drawn.
+ * The Lab's motion and materials, after Apple's interface guidance (ui-skills: emilkowalski/apple-design).
+ *
+ * Motion: a selection travels from where it is to where it goes, critically damped (no overshoot) with a response
+ * near 0.4 s. A CSS transition starts from the presented value when it is retargeted, so a quick second pick turns
+ * the highlight around mid-flight instead of finishing the first move. Nothing loops: a live run is shown by its
+ * colour, its word and its clock.
+ *
+ * Materials: what floats or sticks over scrolling content is translucent and blurred, so the content reads beneath
+ * it; scroll areas fade at their edges instead of ending on a hard cut.
  */
 
-@keyframes lab-pulse {
-  0% {
-    transform: scale(1);
-    opacity: 0.55;
-  }
-  100% {
-    transform: scale(3.2);
-    opacity: 0;
-  }
+:root {
+  /* A critically damped spring with a 0.4 s response, as a cubic Bézier: fast out, long settle, no overshoot. */
+  --lab-spring: cubic-bezier(0.22, 1, 0.36, 1);
+  --lab-response: 380ms;
 }
 
-[data-lab-pulse] {
-  transform-box: fill-box;
-  transform-origin: center;
-  animation: lab-pulse 1.8s cubic-bezier(0.2, 0.6, 0.35, 1) infinite;
+/* The moving selection: the tree's highlight and the map's ring. */
+[data-lab-glide] {
+  transition-property: transform, opacity;
+  transition-duration: var(--lab-response);
+  transition-timing-function: var(--lab-spring);
+}
+
+/* A light material for what floats over content: the chart's readout. */
+[data-lab-material] {
+  background-color: color-mix(in srgb, var(--v2-background-bg-base) 72%, transparent);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+}
+
+/* A heavier material for structure that content scrolls under: the page's tab bar. */
+[data-lab-bar] {
+  background-color: color-mix(in srgb, var(--v2-background-bg-base) 82%, transparent);
+  backdrop-filter: blur(24px) saturate(180%);
+  -webkit-backdrop-filter: blur(24px) saturate(180%);
+}
+
+/* Scroll areas fade out at both ends rather than cutting rows in half. */
+[data-lab-fade-edges] {
+  mask-image: linear-gradient(to bottom, transparent, black 10px, black calc(100% - 18px), transparent);
+}
+
+/* A label drawn straight on the map or a chart: a halo in the ground's colour keeps it legible over lines. */
+[data-lab-halo] {
+  text-shadow:
+    0 0 3px var(--v2-background-bg-base),
+    0 0 3px var(--v2-background-bg-base),
+    0 0 6px var(--v2-background-bg-base);
 }
 
 @media (prefers-reduced-motion: reduce) {
-  [data-lab-pulse] {
-    animation: none;
-    opacity: 0;
+  [data-lab-glide] {
+    transition-property: opacity;
+    transition-duration: 120ms;
+  }
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  [data-lab-material],
+  [data-lab-bar] {
+    background-color: var(--v2-background-bg-base);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+}
+
+@media (prefers-contrast: more) {
+  [data-lab-material],
+  [data-lab-bar] {
+    background-color: var(--v2-background-bg-base);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+
+  [data-lab-fade-edges] {
+    mask-image: none;
   }
 }

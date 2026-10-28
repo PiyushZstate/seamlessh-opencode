@@ -4,8 +4,8 @@ import { Tabs } from "@opencode/ui/tabs"
 import { useLanguage } from "@/runtime/i18n/language"
 import { LabChart } from "./chart"
 import type { Experiment, Run, Study, Verb } from "./contract"
-import { ancestry, deltaWords, duration, figure, live, rows, valueOf } from "./model"
-import { Chip, ColumnHead, EDGE, FIGURES, Label, Node, Notice, READINGS, ROW_TEXT, statusClass, Tile } from "./parts"
+import { ancestry, deltaWords, duration, figure, live, valueOf } from "./model"
+import { ColumnHead, EDGE, FIGURES, Label, Notice, READINGS, statusClass, Tile } from "./parts"
 import type { PageTab } from "./state"
 
 const TABS: readonly PageTab[] = ["overview", "training", "evals", "rollouts", "log"]
@@ -103,7 +103,7 @@ export function LabPage(props: LabPageProps) {
       <div class="min-h-0 flex-1 overflow-y-auto" data-scrollable data-slot="lab-page-body">
         <div class={`flex flex-col gap-4 pb-4 ${EDGE}`}>
           {/* Two tones, as Polar's headlines: what it is, then where it grew from, quieter, in one breath. */}
-          <h2 class="text-20-medium tracking-[-0.01em] text-v2-text-text-base [text-wrap:balance]">
+          <h2 class="text-[22px] font-semibold leading-[1.2] tracking-[-0.02em] text-v2-text-text-base [text-wrap:balance]">
             {props.experiment.title}
             <Show when={parent()}>
               {(from) => (
@@ -114,27 +114,26 @@ export function LabPage(props: LabPageProps) {
               )}
             </Show>
           </h2>
-          <div class="flex flex-wrap items-center gap-1.5" data-slot="lab-page-chips">
-            <span
-              class="inline-flex h-5 items-center gap-1.5 rounded-[6px] border-[0.5px] px-1.5 text-[11px]"
-              classList={{
-                "border-v2-state-border-success bg-v2-state-bg-success text-v2-state-fg-success": going(),
-                "border-v2-border-border-base": !going(),
-                [statusClass(run()?.status)]: !going(),
-              }}
-            >
-              <span class="size-1.5 rounded-full bg-current" classList={{ "opacity-60": !going() }} />
+          {/* Facts as one quiet line, parted by dots, as a Finder or Xcode inspector reads: status first, in its colour. */}
+          <div class="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5 text-12-regular" data-slot="lab-page-facts">
+            <span class={`inline-flex items-center gap-1.5 ${statusClass(run()?.status)}`}>
+              <span class="size-1.5 rounded-full bg-current" />
               {run() ? language.t(`research.status.${run()?.status ?? "Queued"}`) : language.t("research.page.unrun")}
               <Show when={run() && (run()?.millis ?? 0) > 0}>
-                <span class="tabular-nums opacity-80">{duration(run()?.millis ?? 0)}</span>
+                <span class="tabular-nums">{duration(run()?.millis ?? 0)}</span>
               </Show>
             </span>
-            <Chip mono>{props.experiment.branch}</Chip>
+            <span class="text-v2-text-text-faint">·</span>
+            <span class="min-w-0 truncate font-mono text-[11px] text-v2-text-text-muted">
+              {props.experiment.branch}
+            </span>
             <Show when={props.experiment.commit}>
-              <Chip mono>{props.experiment.commit.slice(0, 7)}</Chip>
+              <span class="text-v2-text-text-faint">·</span>
+              <span class="font-mono text-[11px] text-v2-text-text-faint">{props.experiment.commit.slice(0, 7)}</span>
             </Show>
             <Show when={props.experiment.kept}>
-              <Chip>{language.t("research.page.kept")}</Chip>
+              <span class="text-v2-text-text-faint">·</span>
+              <span class="text-v2-text-text-muted">{language.t("research.page.kept")}</span>
             </Show>
           </div>
           <div class="flex flex-wrap gap-1.5" data-slot="lab-actions">
@@ -194,7 +193,8 @@ export function LabPage(props: LabPageProps) {
           value={props.tab}
           onChange={(next: string) => props.onTab(TABS.find((tab) => tab === next) ?? "overview")}
           variant="line"
-          class="!h-auto sticky top-0 z-10 shrink-0 bg-v2-background-bg-base"
+          class="!h-auto sticky top-0 z-10 shrink-0"
+          data-lab-bar
           data-slot="lab-page-tabs"
         >
           <Tabs.List class={`!h-9 !gap-3 ${EDGE}`}>
@@ -251,15 +251,6 @@ function Overview(props: LabPageProps) {
   const parent = () => props.all.find((other) => other.id === props.experiment.parent)
   const current = () => plotted(props.experiment)
 
-  // The path from the root to this experiment, each step with its change on the one before.
-  const climb = createMemo(() => {
-    const lines = rows(props.all, direction())
-
-    return ancestry(props.all, props.experiment.id).flatMap(
-      (id) => lines.find((line) => line.experiment.id === id) ?? [],
-    )
-  })
-
   return (
     <div class={`flex flex-col gap-6 pb-6 pt-4 ${EDGE}`}>
       <Show when={current()}>
@@ -292,45 +283,6 @@ function Overview(props: LabPageProps) {
           <p class="max-w-[65ch] whitespace-pre-wrap text-14-regular text-v2-text-text-base [text-wrap:pretty]">
             {props.experiment.note.trim()}
           </p>
-        </div>
-      </Show>
-      <Show when={climb().length > 1}>
-        <div data-slot="lab-climb">
-          <Label>{language.t("research.page.climb")}</Label>
-          <For each={climb()}>
-            {(line, index) => (
-              <div class="flex h-7 items-center gap-2" style={{ "padding-inline-start": `${index() * 16}px` }}>
-                <Node
-                  status={line.experiment.runs.at(-1)?.status}
-                  hasValue={line.value !== undefined}
-                  best={line.best}
-                  kept={line.experiment.kept}
-                />
-                <span
-                  class={`min-w-0 flex-1 truncate ${ROW_TEXT}`}
-                  classList={{
-                    "text-v2-text-text-base": line.experiment.id === props.experiment.id,
-                    "text-v2-text-text-muted": line.experiment.id !== props.experiment.id,
-                  }}
-                >
-                  {line.experiment.title}
-                </span>
-                <span
-                  class={`w-16 shrink-0 text-end ${FIGURES}`}
-                  classList={{
-                    "text-v2-state-fg-success": line.sign > 0,
-                    "text-v2-state-fg-danger": line.sign < 0,
-                    "text-v2-text-text-faint": line.sign === 0,
-                  }}
-                >
-                  {line.delta ?? ""}
-                </span>
-                <span class={`w-16 shrink-0 text-end text-v2-text-text-base ${FIGURES}`}>
-                  {line.value !== undefined ? figure(line.value) : ""}
-                </span>
-              </div>
-            )}
-          </For>
         </div>
       </Show>
       <Show when={props.experiment.command.trim()}>
