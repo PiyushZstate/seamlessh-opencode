@@ -73,7 +73,7 @@ export function LabChart(props: ChartProps) {
     return `${line(points)}L${x(points.length - 1).toFixed(1)},${props.height - BOTTOM}L${LEFT},${props.height - BOTTOM}Z`
   }
 
-  // A small chart is a glance: two values on its axis, no glow and no words on its target.
+  // A small chart is a glance: two values on its axis and no words on its target.
   const small = () => props.height < 150
   const valueTicks = createMemo(() => ticks(scale().low, scale().high, small() ? 2 : 4))
   const stepTicks = createMemo(() => ticks(0, scale().steps, Math.max(2, Math.floor((width() - LEFT) / 90))))
@@ -138,9 +138,6 @@ export function LabChart(props: ChartProps) {
           aria-hidden="true"
         >
           <defs>
-            <filter id={`${fill}-glow`} x="-10%" y="-30%" width="120%" height="160%">
-              <feGaussianBlur stdDeviation="3" />
-            </filter>
             <linearGradient id={fill} x1="0" x2="0" y1="0" y2="1">
               <stop offset="0%" stop-color="var(--v2-text-text-base)" stop-opacity="0.16" />
               <stop offset="100%" stop-color="var(--v2-text-text-base)" stop-opacity="0" />
@@ -211,18 +208,6 @@ export function LabChart(props: ChartProps) {
               stroke-width="1.25"
               stroke-dasharray="4 3"
               class="stroke-v2-text-text-faint"
-            />
-          </Show>
-          {/* The same line blurred under itself: a little light off the curve, as a render's highlights have. */}
-          <Show when={!small()}>
-            <path
-              d={line(props.points)}
-              fill="none"
-              stroke-width="2.5"
-              class="stroke-v2-text-text-base"
-              opacity="0.14"
-              filter={`url(#${fill}-glow)`}
-              data-lab-fade
             />
           </Show>
           <path

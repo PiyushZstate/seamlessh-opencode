@@ -1,4 +1,4 @@
-import { createMemo, createSignal, createUniqueId, For, Show } from "solid-js"
+import { createMemo, createSignal, For, Show } from "solid-js"
 import { createElementSize } from "@solid-primitives/resize-observer"
 import type { Experiment, Study } from "./contract"
 import { ancestry, best, figure, rows, ticks, valueOf, type Row } from "./model"
@@ -38,7 +38,6 @@ export function LabMap(props: {
   const [box, setBox] = createSignal<HTMLDivElement>()
   const size = createElementSize(box)
   const [hover, setHover] = createSignal<number>()
-  const glow = createUniqueId()
   const width = () => Math.max(size.width ?? 0, LEFT + RIGHT + 80)
   const higher = () => props.study.direction === "Higher"
 
@@ -180,11 +179,6 @@ export function LabMap(props: {
     >
       <Show when={size.width}>
         <svg class="absolute inset-0" width={width()} height={props.height} aria-hidden="true">
-          <defs>
-            <filter id={glow} x="-20%" y="-40%" width="140%" height="180%">
-              <feGaussianBlur stdDeviation="3.5" />
-            </filter>
-          </defs>
           <For each={valueTicks()}>
             {(tick) => (
               <text
@@ -234,21 +228,6 @@ export function LabMap(props: {
               target {figure(props.study.target ?? 0)}
             </text>
           </Show>
-          {/* The lit path once more, blurred beneath: the climb to the best gives off a little light. */}
-          <For each={edges().filter((edge) => edge.lit)}>
-            {(edge) => (
-              <path
-                d={edge.path}
-                fill="none"
-                stroke-width="4"
-                class="stroke-v2-text-text-base"
-                opacity="0.22"
-                filter={`url(#${glow})`}
-                data-lab-fade
-                style={{ "animation-delay": "500ms" }}
-              />
-            )}
-          </For>
           <For each={callouts()}>
             {(card) => {
               // From the node to the card's nearest edge, so a card set aside still points at its node.

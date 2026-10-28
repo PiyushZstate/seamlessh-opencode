@@ -86,16 +86,6 @@
   animation: lab-flow 900ms linear infinite;
 }
 
-/* The map's ground: a dot grid, the lab bench the tree grows on. */
-[data-slot="lab-map"] {
-  background-image: radial-gradient(
-    color-mix(in srgb, var(--v2-text-text-faint) 22%, transparent) 1px,
-    transparent 1.2px
-  );
-  background-size: 16px 16px;
-  background-position: -8px -8px;
-}
-
 @media (prefers-reduced-motion: reduce) {
   [data-lab-draw],
   [data-lab-fade],
