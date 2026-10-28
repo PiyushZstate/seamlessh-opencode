@@ -528,7 +528,11 @@ function SessionScreenContent(props: {
                   </SessionPanelFrame>
                 </div>
                 <Show when={labTree()}>
-                  <div class="flex min-h-0 shrink-0 flex-col" style={{ width: `${LAB_TREE_WIDTH}px` }} data-slot="session-lab-tree">
+                  <div
+                    class="flex min-h-0 shrink-0 flex-col"
+                    style={{ width: `${LAB_TREE_WIDTH}px` }}
+                    data-slot="session-lab-tree"
+                  >
                     <SessionPanelFrame raised>
                       <LabTree
                         state={lab.state()}
@@ -544,7 +548,11 @@ function SessionScreenContent(props: {
                 </Show>
                 <Show when={labPage()}>
                   {(experiment) => (
-                    <div class="flex min-h-0 min-w-0 flex-1 flex-col" style={{ "flex-basis": `${LAB_PAGE_WIDTH}px` }} data-slot="session-lab-page">
+                    <div
+                      class="flex min-h-0 min-w-0 flex-1 flex-col"
+                      style={{ "flex-basis": `${LAB_PAGE_WIDTH}px` }}
+                      data-slot="session-lab-page"
+                    >
                       <SessionPanelFrame raised>
                         <LabPage
                           experiment={experiment()}
@@ -682,6 +690,6 @@ function SessionScreenContent(props: {
 
 const BOTTOM_PANE_HEIGHT_MIN = 120
 
-const LAB_TREE_WIDTH = 340
+const LAB_TREE_WIDTH = 440
 
 const LAB_PAGE_WIDTH = 480

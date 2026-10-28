@@ -25,7 +25,8 @@ export type Row = {
 /** Which way each verdict moved, for its colour. */
 const SIGN: Record<Verdict, number> = { better: 1, worse: -1, same: 0, baseline: 0, none: 0 }
 
-const beats = (direction: Direction, value: number, than: number) => (direction === "Higher" ? value > than : value < than)
+const beats = (direction: Direction, value: number, than: number) =>
+  direction === "Higher" ? value > than : value < than
 
 /** The value of its latest run that succeeded and printed one. */
 export function valueOf(experiment: Experiment) {
@@ -123,7 +124,8 @@ export function deltaWords(value: number, parent: number, direction: Direction) 
 
   if (factor !== undefined && factor >= 2) return `${factor >= 10 ? factor.toFixed(0) : factor.toFixed(1)}×`
 
-  if (factor !== undefined && factor <= 0.5) return `÷${1 / factor >= 10 ? (1 / factor).toFixed(0) : (1 / factor).toFixed(1)}`
+  if (factor !== undefined && factor <= 0.5)
+    return `÷${1 / factor >= 10 ? (1 / factor).toFixed(0) : (1 / factor).toFixed(1)}`
 
   if (value >= 0 && value <= 1 && parent >= 0 && parent <= 1) return `${signed(sign * (value - parent) * 100)} pts`
 
@@ -162,12 +164,7 @@ export function duration(millis: number) {
 
 /** The experiment shown: the person's pick while it exists, else the latest live one, else the best, else the last. */
 export function picked(all: readonly Experiment[], direction: Direction, pick: number | undefined) {
-  return (
-    all.find((experiment) => experiment.id === pick) ??
-    all.findLast(live) ??
-    best(all, direction) ??
-    all.at(-1)
-  )
+  return all.find((experiment) => experiment.id === pick) ?? all.findLast(live) ?? best(all, direction) ?? all.at(-1)
 }
 
 /** Whether the best value meets the study's target. */
@@ -175,5 +172,43 @@ export function reached(study: Study, all: readonly Experiment[]) {
   const top = best(all, study.direction)
   const value = top && valueOf(top)
 
-  return study.target !== null && value !== undefined && (value === study.target || beats(study.direction, value, study.target))
+  return (
+    study.target !== null &&
+    value !== undefined &&
+    (value === study.target || beats(study.direction, value, study.target))
+  )
+}
+
+/**
+ * Round tick values covering `low` to `high`, about `count` of them, on steps of 1, 2 or 5 times a power of ten, as
+ * d3's ticks are, so an axis reads `0.6 0.7 0.8` rather than `0.613 0.708`.
+ */
+export function ticks(low: number, high: number, count: number) {
+  if (!(high > low) || count < 1) return [low]
+  const raw = (high - low) / count
+  const power = 10 ** Math.floor(Math.log10(raw))
+  // d3's thresholds: the nearest of 1, 2, 5 and 10 on a log scale, not the next one up.
+  const error = raw / power
+  const step = power * (error >= Math.sqrt(50) ? 10 : error >= Math.sqrt(10) ? 5 : error >= Math.sqrt(2) ? 2 : 1)
+  const first = Math.ceil(low / step)
+  const last = Math.floor(high / step)
+
+  // Built from integers times the step, so 0.1 + 0.2 never shows as 0.30000000000000004.
+  return Array.from({ length: last - first + 1 }, (_, index) => Number(((first + index) * step).toPrecision(12)))
+}
+
+/** The ids from the root down to `id`, following parents; a cycle from a bad state file stops. */
+export function ancestry(all: readonly Experiment[], id: number) {
+  const path: number[] = []
+  const seen = new Set<number>()
+  let at = all.find((experiment) => experiment.id === id)
+
+  while (at && !seen.has(at.id)) {
+    seen.add(at.id)
+    path.unshift(at.id)
+    const up = at.parent
+    at = all.find((experiment) => experiment.id === up)
+  }
+
+  return path
 }

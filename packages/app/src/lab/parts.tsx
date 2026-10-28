@@ -1,4 +1,5 @@
 import { Show, type JSX } from "solid-js"
+import "./lab.css"
 import { IconButton } from "@opencode/ui/icon-button"
 import { Icon } from "@opencode/ui/icon"
 import { Tooltip } from "@opencode/ui/tooltip"
@@ -90,4 +91,39 @@ export function Notice(props: { title?: string; body: string; children?: JSX.Ele
 /** A small label over its section, in the muted 12px the session's side panels use. */
 export function Label(props: { children: JSX.Element }) {
   return <div class="pb-1 text-12-medium text-v2-text-text-muted">{props.children}</div>
+}
+
+/** A reading: its label, then its figures in the code face, on the raised layer with a hairline. */
+export function Tile(props: { label: string; live?: boolean; children: JSX.Element }) {
+  return (
+    <div
+      class="flex min-w-0 flex-col rounded-[10px] border-[0.5px] border-v2-border-border-muted bg-v2-background-bg-layer-01 px-2.5 py-2"
+      data-slot="lab-tile"
+    >
+      <span class="flex items-center gap-1.5 truncate text-[11px] leading-4 text-v2-text-text-faint">
+        <Show when={props.live}>
+          <span class="relative flex size-1.5">
+            <span class="absolute inset-0 rounded-full bg-v2-state-fg-success" data-lab-pulse />
+            <span class="relative size-1.5 rounded-full bg-v2-state-fg-success" />
+          </span>
+        </Show>
+        {props.label}
+      </span>
+      <span class={`flex min-w-0 flex-wrap items-baseline gap-x-1.5 font-mono text-[15px] leading-6 tabular-nums`}>
+        {props.children}
+      </span>
+    </div>
+  )
+}
+
+/** A study parameter as a quiet pill, as ArkenOS lists a design's inputs under its title. */
+export function Chip(props: { mono?: boolean; children: JSX.Element }) {
+  return (
+    <span
+      class="inline-flex h-5 max-w-full items-center truncate rounded-[6px] border-[0.5px] border-v2-border-border-muted bg-v2-background-bg-layer-01 px-1.5 text-[11px] text-v2-text-text-muted"
+      classList={{ "font-mono tabular-nums": props.mono }}
+    >
+      {props.children}
+    </span>
+  )
 }

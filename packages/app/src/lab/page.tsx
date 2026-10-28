@@ -2,9 +2,10 @@ import { createEffect, createMemo, createSignal, For, Match, on, onCleanup, Show
 import { Button } from "@opencode/ui/button"
 import { Tabs } from "@opencode/ui/tabs"
 import { useLanguage } from "@/runtime/i18n/language"
+import { LabChart } from "./chart"
 import type { Experiment, Run, Study, Verb } from "./contract"
-import { duration, figure, live, rows, valueOf } from "./model"
-import { ColumnHead, EDGE, FIGURES, Label, Node, Notice, ROW_TEXT, statusClass } from "./parts"
+import { ancestry, deltaWords, duration, figure, live, rows, valueOf } from "./model"
+import { Chip, ColumnHead, EDGE, FIGURES, Label, Node, Notice, ROW_TEXT, statusClass, Tile } from "./parts"
 import type { PageTab } from "./state"
 
 const TABS: readonly PageTab[] = ["overview", "training", "evals", "rollouts", "log"]
@@ -26,15 +27,46 @@ export type LabPageProps = {
   reserve?: boolean
 }
 
+/** The latest run that printed values, which is the one a curve can show. */
+const plotted = (experiment: Experiment | undefined) => experiment?.runs.findLast((run) => run.points.length > 0)
+
+/** What an experiment stands at: its finished value, else a live run's newest print. */
+const standing = (experiment: Experiment | undefined) => {
+  if (!experiment) return
+
+  const run = experiment.runs.at(-1)
+
+  if (run?.status === "Running") return run.points.at(-1) ?? run.value ?? undefined
+
+  return valueOf(experiment)
+}
+
 /**
- * The picked experiment (D24): its title and branch, Rerun, Keep and Stop, and five tabs. Overview reads its climb
- * from the root, note, command and runs; Training draws the metric each run printed against its parent's; Log is the
- * end of the latest run's output. Evals and Rollouts wait for the host to report them.
+ * The picked experiment (D24), laid out as ArkenOS lays out a report: its title and where it grew from, its inputs as
+ * chips, the actions, four readings across (the metric, the change on its parent and on the baseline, and its runs),
+ * then five tabs. Overview draws the run's curve against its parent's with the target and the peak called out;
+ * Training adds every run as its own small chart; Log is the end of the latest run's output.
  */
 export function LabPage(props: LabPageProps) {
   const language = useLanguage()
   const id = () => props.experiment.id
   const parent = () => props.all.find((other) => other.id === props.experiment.parent)
+  const direction = () => props.study?.direction ?? "Higher"
+  const run = () => props.experiment.runs.at(-1)
+  const going = () => run()?.status === "Running"
+  const value = () => standing(props.experiment)
+  const root = () => props.all.find((other) => other.id === ancestry(props.all, id())[0])
+
+  const change = (than: Experiment | undefined) => {
+    const now = value()
+    const before = standing(than)
+
+    if (now === undefined || before === undefined || than?.id === id()) return
+
+    const sign = now === before ? 0 : (direction() === "Higher" ? now > before : now < before) ? 1 : -1
+
+    return { words: deltaWords(now, before, direction()) ?? "—", sign }
+  }
 
   // Single keys while focus is in the page and not in a field, so OpenCode's own keymap keeps everything else.
   const onKeyDown = (event: KeyboardEvent) => {
@@ -60,53 +92,112 @@ export function LabPage(props: LabPageProps) {
       onKeyDown={onKeyDown}
     >
       <ColumnHead close={language.t("research.page.close")} onClose={props.onClose} reserve={props.reserve}>
-        <span class="truncate text-14-medium text-v2-text-text-base">{props.experiment.title}</span>
-        <span class={`shrink-0 text-v2-text-text-faint ${FIGURES}`}>#{id()}</span>
-        <Show when={props.experiment.kept}>
-          <span class="shrink-0 text-12-regular text-v2-text-text-muted">{language.t("research.page.kept")}</span>
-        </Show>
+        <span class="truncate text-12-regular text-v2-text-text-faint">
+          {props.study?.repo ?? props.experiment.repo}
+          <span class="px-1.5">›</span>
+          {language.t("research.tree.title")}
+          <span class="px-1.5">›</span>
+          <span class="text-v2-text-text-muted">#{id()}</span>
+        </span>
       </ColumnHead>
-      <div class={`flex shrink-0 flex-col gap-3 pb-2 ${EDGE}`}>
-        <div class="-mt-2 flex min-w-0 items-baseline gap-2">
-          <span class="min-w-0 shrink truncate text-12-mono text-v2-text-text-faint">{props.experiment.branch}</span>
-          <Show when={parent()}>
-            {(from) => (
-              <span class="min-w-0 truncate text-12-regular text-v2-text-text-muted">
-                {language.t("research.page.from", { id: from().id, title: from().title })}
-              </span>
-            )}
-          </Show>
-        </div>
-        <div class="flex flex-wrap gap-1.5" data-slot="lab-actions">
-          <Button size="small" variant="contrast" onClick={() => props.onAct("run", id())}>
-            {language.t("research.action.rerun")}
-          </Button>
-          <Button
-            size="small"
-            variant="ghost"
-            onClick={() => props.onAct(props.experiment.kept ? "unkeep" : "keep", id())}
-          >
-            {language.t(props.experiment.kept ? "research.action.unkeep" : "research.action.keep")}
-          </Button>
-          <Show when={live(props.experiment)}>
-            <Button size="small" variant="ghost" onClick={() => props.onAct("cancel", id())}>
-              {language.t("research.action.stop")}
-            </Button>
-          </Show>
-        </div>
-      </div>
-      <Tabs
-        value={props.tab}
-        onChange={(value: string) => props.onTab(TABS.find((tab) => tab === value) ?? "overview")}
-        variant="line"
-        class="!h-auto shrink-0"
-        data-slot="lab-page-tabs"
-      >
-        <Tabs.List class={`!h-9 !gap-3 ${EDGE}`}>
-          <For each={TABS}>{(tab) => <Tabs.Trigger value={tab}>{language.t(`research.tab.${tab}`)}</Tabs.Trigger>}</For>
-        </Tabs.List>
-      </Tabs>
       <div class="min-h-0 flex-1 overflow-y-auto" data-scrollable data-slot="lab-page-body">
+        <div class={`flex flex-col gap-3 pb-3 ${EDGE}`} data-lab-rise>
+          <div class="flex flex-col gap-1">
+            <h2 class="text-20-medium text-v2-text-text-base [text-wrap:balance]">{props.experiment.title}</h2>
+            <Show when={parent()}>
+              {(from) => (
+                <span class="text-13-regular text-v2-text-text-muted">
+                  {language.t("research.page.from", { id: from().id, title: from().title })}
+                </span>
+              )}
+            </Show>
+          </div>
+          <div class="flex flex-wrap items-center gap-1.5" data-slot="lab-page-chips">
+            <span
+              class="inline-flex h-5 items-center gap-1.5 rounded-[6px] border-[0.5px] px-1.5 text-[11px]"
+              classList={{
+                "border-v2-state-border-success bg-v2-state-bg-success text-v2-state-fg-success": going(),
+                "border-v2-border-border-muted bg-v2-background-bg-layer-01": !going(),
+                [statusClass(run()?.status)]: !going(),
+              }}
+            >
+              <span class="size-1.5 rounded-full bg-current" classList={{ "opacity-60": !going() }} />
+              {run() ? language.t(`research.status.${run()?.status ?? "Queued"}`) : language.t("research.page.unrun")}
+              <Show when={run() && (run()?.millis ?? 0) > 0}>
+                <span class="font-mono tabular-nums opacity-80">{duration(run()?.millis ?? 0)}</span>
+              </Show>
+            </span>
+            <Chip mono>{props.experiment.branch}</Chip>
+            <Show when={props.experiment.commit}>
+              <Chip mono>{props.experiment.commit.slice(0, 7)}</Chip>
+            </Show>
+            <Show when={props.experiment.kept}>
+              <Chip>{language.t("research.page.kept")}</Chip>
+            </Show>
+          </div>
+          <div class="flex flex-wrap gap-1.5" data-slot="lab-actions">
+            <Button size="small" variant="contrast" onClick={() => props.onAct("run", id())}>
+              {language.t("research.action.rerun")}
+              <kbd class="ms-1.5 font-mono text-[10px] opacity-55">R</kbd>
+            </Button>
+            <Button
+              size="small"
+              variant="ghost"
+              onClick={() => props.onAct(props.experiment.kept ? "unkeep" : "keep", id())}
+            >
+              {language.t(props.experiment.kept ? "research.action.unkeep" : "research.action.keep")}
+              <kbd class="ms-1.5 font-mono text-[10px] text-v2-text-text-faint">K</kbd>
+            </Button>
+            <Show when={live(props.experiment)}>
+              <Button size="small" variant="ghost" onClick={() => props.onAct("cancel", id())}>
+                {language.t("research.action.stop")}
+                <kbd class="ms-1.5 font-mono text-[10px] text-v2-text-text-faint">S</kbd>
+              </Button>
+            </Show>
+          </div>
+          <div class="grid grid-cols-2 gap-1.5 @[460px]:grid-cols-4" data-slot="lab-readings">
+            <Tile label={props.study?.metric ?? language.t("research.study.metric")} live={going()}>
+              <span class="text-v2-text-text-base">{value() !== undefined ? figure(value() ?? 0) : "—"}</span>
+              <Show when={going()}>
+                <span class="basis-full font-sans text-[11px] leading-4 text-v2-state-fg-success">
+                  {language.t("research.page.live")}
+                </span>
+              </Show>
+            </Tile>
+            <Tile label={language.t("research.page.vsParent")}>
+              <Reading
+                change={change(parent())}
+                under={parent() ? `#${parent()?.id}` : language.t("research.page.root")}
+              />
+            </Tile>
+            <Tile label={language.t("research.page.vsBaseline")}>
+              <Reading change={change(root())} under={root() ? `#${root()?.id}` : undefined} />
+            </Tile>
+            <Tile label={language.t("research.page.runs")}>
+              <span class="text-v2-text-text-base">{props.experiment.runs.length}</span>
+              <Show when={run()}>
+                {(last) => (
+                  <span class="basis-full font-sans text-[11px] leading-4 text-v2-text-text-faint">
+                    #{last().number}
+                  </span>
+                )}
+              </Show>
+            </Tile>
+          </div>
+        </div>
+        <Tabs
+          value={props.tab}
+          onChange={(next: string) => props.onTab(TABS.find((tab) => tab === next) ?? "overview")}
+          variant="line"
+          class="!h-auto sticky top-0 z-10 shrink-0 bg-v2-background-bg-base"
+          data-slot="lab-page-tabs"
+        >
+          <Tabs.List class={`!h-9 !gap-3 ${EDGE}`}>
+            <For each={TABS}>
+              {(tab) => <Tabs.Trigger value={tab}>{language.t(`research.tab.${tab}`)}</Tabs.Trigger>}
+            </For>
+          </Tabs.List>
+        </Tabs>
         <Switch>
           <Match when={props.tab === "overview"}>
             <Overview {...props} />
@@ -129,29 +220,75 @@ export function LabPage(props: LabPageProps) {
   )
 }
 
+/** A change as a reading: its words coloured by whether it helped, and what it is measured against. */
+function Reading(props: { change: { words: string; sign: number } | undefined; under?: string }) {
+  return (
+    <>
+      <span
+        classList={{
+          "text-v2-state-fg-success": (props.change?.sign ?? 0) > 0,
+          "text-v2-state-fg-danger": (props.change?.sign ?? 0) < 0,
+          "text-v2-text-text-faint": !props.change || props.change.sign === 0,
+        }}
+      >
+        {props.change?.words ?? "—"}
+      </span>
+      <Show when={props.under}>
+        <span class="basis-full font-sans text-[11px] leading-4 text-v2-text-text-faint">{props.under}</span>
+      </Show>
+    </>
+  )
+}
+
 function Overview(props: LabPageProps) {
   const language = useLanguage()
   const direction = () => props.study?.direction ?? "Higher"
+  const parent = () => props.all.find((other) => other.id === props.experiment.parent)
+  const current = () => plotted(props.experiment)
 
   // The path from the root to this experiment, each step with its change on the one before.
   const climb = createMemo(() => {
     const lines = rows(props.all, direction())
-    const path: number[] = []
-    const seen = new Set<number>()
-    let at: Experiment | undefined = props.experiment
 
-    while (at && !seen.has(at.id)) {
-      seen.add(at.id)
-      path.unshift(at.id)
-      const up: number | null = at.parent
-      at = props.all.find((other) => other.id === up)
-    }
-
-    return path.flatMap((id) => lines.find((line) => line.experiment.id === id) ?? [])
+    return ancestry(props.all, props.experiment.id).flatMap(
+      (id) => lines.find((line) => line.experiment.id === id) ?? [],
+    )
   })
 
   return (
-    <div class={`flex flex-col gap-5 pb-5 pt-3 ${EDGE}`}>
+    <div class={`flex flex-col gap-6 pb-6 pt-4 ${EDGE}`}>
+      <Show when={current()}>
+        {(run) => (
+          <div data-slot="lab-overview-chart">
+            <div class="flex items-baseline justify-between gap-3 pb-1">
+              <span class="text-13-medium text-v2-text-text-base">{language.t("research.page.curve")}</span>
+              <span class="truncate font-mono text-[11px] text-v2-text-text-faint">
+                {props.study?.metric} · {language.t("research.page.ofRun", { run: run().number })}
+              </span>
+            </div>
+            <LabChart
+              points={run().points}
+              parent={plotted(parent())?.points}
+              parentName={parent() ? `#${parent()?.id}` : undefined}
+              target={props.study?.target}
+              direction={direction()}
+              live={run().status === "Running"}
+              failed={run().status === "Failed" || run().status === "Lost"}
+              metric={`#${props.experiment.id}`}
+              height={210}
+              peak={run().status === "Succeeded" || run().status === "Running"}
+            />
+          </div>
+        )}
+      </Show>
+      <Show when={props.experiment.note.trim()}>
+        <div data-slot="lab-note">
+          <Label>{language.t("research.page.note")}</Label>
+          <p class="max-w-[65ch] whitespace-pre-wrap text-14-regular text-v2-text-text-base [text-wrap:pretty]">
+            {props.experiment.note.trim()}
+          </p>
+        </div>
+      </Show>
       <Show when={climb().length > 1}>
         <div data-slot="lab-climb">
           <Label>{language.t("research.page.climb")}</Label>
@@ -191,18 +328,11 @@ function Overview(props: LabPageProps) {
           </For>
         </div>
       </Show>
-      <Show when={props.experiment.note.trim()}>
-        <div data-slot="lab-note">
-          <Label>{language.t("research.page.note")}</Label>
-          <p class="max-w-[65ch] whitespace-pre-wrap text-14-regular text-v2-text-text-base [text-wrap:pretty]">
-            {props.experiment.note.trim()}
-          </p>
-        </div>
-      </Show>
       <Show when={props.experiment.command.trim()}>
         <div data-slot="lab-command">
           <Label>{language.t("research.page.command")}</Label>
-          <code class="block overflow-x-auto whitespace-pre rounded-md bg-v2-background-bg-layer-02 px-2 py-1.5 text-12-mono text-v2-text-text-base">
+          <code class="block overflow-x-auto whitespace-pre rounded-[8px] border-[0.5px] border-v2-border-border-muted bg-v2-background-bg-layer-01 px-2.5 py-2 text-12-mono text-v2-text-text-base">
+            <span class="select-none text-v2-text-text-faint">$ </span>
             {props.experiment.command}
           </code>
         </div>
@@ -214,7 +344,11 @@ function Overview(props: LabPageProps) {
         </div>
       </Show>
       <Show when={valueOf(props.experiment) === undefined && props.experiment.runs.at(-1)?.error}>
-        {(error) => <div class="text-12-mono text-v2-state-fg-danger [overflow-wrap:anywhere]">{error()}</div>}
+        {(error) => (
+          <div class="rounded-[8px] border-[0.5px] border-v2-state-border-danger bg-v2-state-bg-danger px-2.5 py-2 text-12-mono text-v2-state-fg-danger [overflow-wrap:anywhere]">
+            {error()}
+          </div>
+        )}
       </Show>
     </div>
   )
@@ -240,127 +374,82 @@ function RunRow(props: { run: Run }) {
   )
 }
 
-/** The latest run that printed values, which is the one a curve can show. */
-const plotted = (experiment: Experiment | undefined) => experiment?.runs.findLast((run) => run.points.length > 0)
-
-/** SVG units across and down; the strokes do not scale, so only the shape stretches with the column. */
-const WIDE = 600
-
-const TALL = 200
-
 /**
- * The metric each value a run printed, in order, against the parent's latest curve dashed. Monochrome: the
- * experiment in the base ink, its parent faint; only a live run's newest value is green.
+ * Every curve this experiment's runs printed: the latest large against its parent's, then each run as its own small
+ * chart, so a rerun reads as a control beside the first.
  */
 function Training(props: { experiment: Experiment; parent: Experiment | undefined; study: Study | null }) {
   const language = useLanguage()
+  const direction = () => props.study?.direction ?? "Higher"
   const run = () => plotted(props.experiment)
-  const before = () => plotted(props.parent)
-
-  const scale = createMemo(() => {
-    const series = [run()?.points ?? [], before()?.points ?? []]
-    const values = series.flat()
-    const low = Math.min(...values)
-    const high = Math.max(...values)
-    // A flat curve gets a band around it, so it draws across the middle instead of along an edge.
-    const pad = high === low ? Math.abs(high) * 0.05 || 1 : (high - low) * 0.08
-    const steps = Math.max(...series.map((points) => points.length), 2) - 1
-
-    return { low: low - pad, high: high + pad, steps }
-  })
-
-  const x = (index: number) => (index / scale().steps) * WIDE
-  const y = (value: number) => TALL - ((value - scale().low) / (scale().high - scale().low)) * TALL
-
-  const path = (points: readonly number[]) =>
-    points.map((value, index) => `${index === 0 ? "M" : "L"}${x(index).toFixed(1)},${y(value).toFixed(1)}`).join("")
-
-  const last = () => {
-    const points = run()?.points ?? []
-    const value = points.at(-1)
-
-    return value === undefined ? undefined : { value, left: x(points.length - 1) / WIDE, top: y(value) / TALL }
-  }
+  const runs = () => props.experiment.runs.filter((each) => each.points.length > 1)
 
   return (
     <Show
       when={run()}
-      fallback={
-        <Notice body={language.t("research.training.empty", { metric: props.study?.metric ?? "metric" })} />
-      }
+      fallback={<Notice body={language.t("research.training.empty", { metric: props.study?.metric ?? "metric" })} />}
     >
       {(current) => (
-        <div class={`flex flex-col gap-2 pb-5 pt-3 ${EDGE}`} data-slot="lab-training">
-          <div class="flex items-baseline justify-between gap-3">
-            <span class="truncate text-12-mono text-v2-text-text-muted">{props.study?.metric}</span>
-            <span class={`shrink-0 text-v2-text-text-faint ${FIGURES}`}>{figure(scale().high)}</span>
-          </div>
-          <div class="relative h-48 w-full">
-            <svg
-              class="absolute inset-0 size-full overflow-visible"
-              viewBox={`0 0 ${WIDE} ${TALL}`}
-              preserveAspectRatio="none"
-              aria-hidden="true"
-            >
-              <line
-                x1="0"
-                x2={WIDE}
-                y1={TALL}
-                y2={TALL}
-                class="stroke-v2-border-border-base"
-                vector-effect="non-scaling-stroke"
-              />
-              <Show when={before()}>
-                {(earlier) => (
-                  <path
-                    d={path(earlier().points)}
-                    fill="none"
-                    class="stroke-v2-text-text-faint"
-                    stroke-width="1.25"
-                    stroke-dasharray="4 3"
-                    vector-effect="non-scaling-stroke"
-                  />
-                )}
-              </Show>
-              <path
-                d={path(current().points)}
-                fill="none"
-                class="stroke-v2-text-text-base"
-                stroke-width="1.5"
-                stroke-linejoin="round"
-                vector-effect="non-scaling-stroke"
-              />
-            </svg>
-            <Show when={last()}>
-              {(end) => (
-                // HTML, not SVG, so the stretched viewBox does not squash it.
-                <span
-                  class="absolute size-1.5 -translate-x-1/2 -translate-y-1/2 rounded-full"
-                  classList={{
-                    "bg-[var(--v2-state-fg-success)]": current().status === "Running",
-                    "bg-v2-text-text-base": current().status !== "Running",
-                  }}
-                  style={{ left: `${end().left * 100}%`, top: `${end().top * 100}%` }}
-                />
-              )}
-            </Show>
-          </div>
-          <div class="flex items-baseline justify-between gap-3">
-            <span class={`text-v2-text-text-faint ${FIGURES}`}>{figure(scale().low)}</span>
-            <span class={`text-v2-text-text-base ${FIGURES}`}>{last() ? figure(last()?.value ?? 0) : ""}</span>
-          </div>
-          <div class="flex flex-wrap gap-x-4 gap-y-1 pt-1 text-12-regular text-v2-text-text-muted">
-            <span class="flex items-center gap-1.5">
-              <span class="h-px w-4 bg-v2-text-text-base" />
+        <div class={`flex flex-col gap-6 pb-6 pt-4 ${EDGE}`} data-slot="lab-training">
+          <div>
+            <div class="flex items-baseline justify-between gap-3 pb-1">
+              <span class="truncate font-mono text-[12px] text-v2-text-text-base">{props.study?.metric}</span>
+              <div class="flex shrink-0 items-center gap-3 text-[11px] text-v2-text-text-muted">
+                <span class="flex items-center gap-1.5">
+                  <span class="h-[1.5px] w-4 rounded-full bg-v2-text-text-base" />#{props.experiment.id}
+                </span>
+                <Show when={plotted(props.parent)}>
+                  <span class="flex items-center gap-1.5">
+                    <span class="w-4 border-t border-dashed border-v2-text-text-faint" />
+                    {language.t("research.training.parent", { id: props.parent?.id ?? 0 })}
+                  </span>
+                </Show>
+              </div>
+            </div>
+            <LabChart
+              points={current().points}
+              parent={plotted(props.parent)?.points}
+              parentName={props.parent ? `#${props.parent.id}` : undefined}
+              target={props.study?.target}
+              direction={direction()}
+              live={current().status === "Running"}
+              failed={current().status === "Failed" || current().status === "Lost"}
+              metric={`#${props.experiment.id}`}
+              height={280}
+              peak={current().status === "Succeeded" || current().status === "Running"}
+            />
+            <div class="pt-1 text-[11px] text-v2-text-text-faint">
               {language.t("research.training.points", { count: current().points.length, run: current().number })}
-            </span>
-            <Show when={before() && props.parent}>
-              <span class="flex items-center gap-1.5">
-                <span class="w-4 border-t border-dashed border-v2-text-text-faint" />
-                {language.t("research.training.parent", { id: props.parent?.id ?? 0 })}
-              </span>
-            </Show>
+            </div>
           </div>
+          <Show when={runs().length > 1}>
+            <div>
+              <Label>{language.t("research.training.runs")}</Label>
+              <div class="grid grid-cols-1 gap-2 @[460px]:grid-cols-2">
+                <For each={runs()}>
+                  {(each) => (
+                    <div class="rounded-[10px] border-[0.5px] border-v2-border-border-muted bg-v2-background-bg-layer-01 px-2 pb-1 pt-2">
+                      <div class="flex items-baseline justify-between gap-2 px-1 font-mono text-[11px] tabular-nums">
+                        <span class="text-v2-text-text-faint">#{each.number}</span>
+                        <span class={each.status === "Running" ? "text-v2-state-fg-success" : "text-v2-text-text-base"}>
+                          {each.value !== null ? figure(each.value) : ""}
+                        </span>
+                      </div>
+                      <LabChart
+                        points={each.points}
+                        target={props.study?.target}
+                        direction={direction()}
+                        live={each.status === "Running"}
+                        failed={each.status === "Failed" || each.status === "Lost"}
+                        metric={`#${each.number}`}
+                        height={110}
+                      />
+                    </div>
+                  )}
+                </For>
+              </div>
+            </div>
+          </Show>
         </div>
       )}
     </Show>
@@ -402,6 +491,20 @@ function Log(props: { experiment: Experiment; log: (id: number) => Promise<strin
     ),
   )
   const timer = setInterval(() => live(props.experiment) && read(), LOG_EVERY)
+
+  // Numbers carry a log: they take the base ink, the words around them stay quiet.
+  const lines = createMemo(() =>
+    (text() ?? "")
+      .replace(/\n$/, "")
+      .split("\n")
+      .map((line) =>
+        line
+          .split(/(-?\d+(?:\.\d+)?(?:e[-+]?\d+)?)/i)
+          .filter((part) => part !== "")
+          .map((part) => ({ text: part, number: /^-?\d/.test(part) })),
+      ),
+  )
+
   onCleanup(() => clearInterval(timer))
 
   return (
@@ -415,10 +518,24 @@ function Log(props: { experiment: Experiment; log: (id: number) => Promise<strin
       <Match when={true}>
         <pre
           ref={body}
-          class={`whitespace-pre-wrap py-3 text-12-mono text-v2-text-text-muted [overflow-wrap:anywhere] ${EDGE}`}
+          class={`grid grid-cols-[auto_1fr] gap-x-3 py-3 text-12-mono text-v2-text-text-faint ${EDGE}`}
           data-slot="lab-log"
         >
-          {text() ?? ""}
+          <For each={lines()}>
+            {(line, index) => (
+              <>
+                <span class="select-none text-end tabular-nums opacity-60">{index() + 1}</span>
+                <span class="whitespace-pre-wrap [overflow-wrap:anywhere]">
+                  <For each={line}>
+                    {(part) => <span classList={{ "text-v2-text-text-base": part.number }}>{part.text}</span>}
+                  </For>
+                  <Show when={live(props.experiment) && index() === lines().length - 1}>
+                    <span class="ms-1 inline-block h-3 w-1.5 translate-y-0.5 bg-v2-state-fg-success" data-lab-blink />
+                  </Show>
+                </span>
+              </>
+            )}
+          </For>
         </pre>
       </Match>
     </Switch>

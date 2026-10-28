@@ -2,8 +2,9 @@ import { createMemo, For, Match, Show, Switch } from "solid-js"
 import { Button } from "@opencode/ui/button"
 import { useLanguage } from "@/runtime/i18n/language"
 import type { Experiment, Snapshot, Study } from "./contract"
-import { best, figure, reached, rows, valueOf, type Row } from "./model"
-import { ColumnHead, EDGE, FIGURES, Node, Notice, ROW_TEXT, statusClass } from "./parts"
+import { best, duration, figure, reached, rows, valueOf, type Row } from "./model"
+import { LabMap } from "./map"
+import { Chip, ColumnHead, EDGE, FIGURES, Node, Notice, ROW_TEXT, statusClass, Tile } from "./parts"
 import type { LabState } from "./state"
 
 export type LabTreeProps = {
@@ -59,7 +60,20 @@ function Research(props: LabTreeProps & { snapshot: Snapshot }) {
   return (
     <>
       <Show when={props.snapshot.study}>
-        {(study) => <Strip study={study()} all={props.snapshot.experiments} running={props.running} />}
+        {(study) => (
+          <>
+            <Strip study={study()} all={props.snapshot.experiments} running={props.running} />
+            <Show when={lines().length > 0}>
+              <LabMap
+                study={study()}
+                all={props.snapshot.experiments}
+                picked={props.picked}
+                onPick={props.onPick}
+                height={MAP_HEIGHT}
+              />
+            </Show>
+          </>
+        )}
       </Show>
       <Show
         when={lines().length > 0}
@@ -87,7 +101,13 @@ function Research(props: LabTreeProps & { snapshot: Snapshot }) {
   )
 }
 
-/** The goal as the column's headline, its numbers as labelled figures read across, then the running run. */
+/** The map's height: tall enough that a few points of accuracy read as a climb. */
+const MAP_HEIGHT = 280
+
+/**
+ * The goal as the column's headline, then three tiles read across, as ArkenOS's readings are: the best value and
+ * where it stands against the target, the target itself, and the run going now.
+ */
 function Strip(props: { study: Study; all: readonly Experiment[]; running: Experiment | undefined }) {
   const language = useLanguage()
   const top = createMemo(() => best(props.all, props.study.direction))
@@ -99,58 +119,70 @@ function Strip(props: { study: Study; all: readonly Experiment[]; running: Exper
   }
 
   const met = () => reached(props.study, props.all)
+  const run = () => props.running?.runs.findLast((each) => each.status === "Running" || each.status === "Queued")
+
+  // How far the best has come from the baseline toward the target, for the meter under it.
+  const progress = createMemo(() => {
+    const target = props.study.target
+    const start = props.all.find((experiment) => experiment.parent === null)
+    const from = start && valueOf(start)
+    const now = value()
+
+    if (target === null || from === undefined || now === undefined || target === from) return
+
+    return Math.min(1, Math.max(0, (now - from) / (target - from)))
+  })
 
   return (
-    <div class={`flex shrink-0 flex-col gap-3 border-b border-v2-border-border-muted pb-3 ${EDGE}`} data-slot="lab-study">
+    <div class={`flex shrink-0 flex-col gap-3 pb-3 ${EDGE}`} data-slot="lab-study">
       <Show when={props.study.goal.trim()}>
-        <div class="line-clamp-3 text-14-regular text-v2-text-text-base [text-wrap:pretty]">{props.study.goal.trim()}</div>
+        <div class="line-clamp-3 text-14-medium text-v2-text-text-base [text-wrap:pretty]">
+          {props.study.goal.trim()}
+        </div>
       </Show>
-      <div class="grid grid-cols-3 gap-3">
-        <Figure
-          label={language.t("research.study.metric")}
-          value={props.study.metric}
-          under={language.t(`research.direction.${props.study.direction}`)}
-        />
-        <Figure
-          label={language.t("research.study.best")}
-          value={value() !== undefined ? figure(value() ?? 0) : "—"}
-          under={top() ? `#${top()?.id}` : undefined}
-        />
-        <Show when={props.study.target !== null}>
-          <Figure
-            label={language.t("research.study.target")}
-            value={figure(props.study.target ?? 0)}
-            under={met() ? language.t("research.study.reached") : undefined}
-            good={met()}
-          />
-        </Show>
+      <div class="flex flex-wrap items-center gap-1.5">
+        <Chip mono>{props.study.metric}</Chip>
+        <Chip>{language.t(`research.direction.${props.study.direction}`)}</Chip>
       </div>
-      <Show when={props.running}>
-        {(experiment) => (
-          <div class="flex min-w-0 items-baseline gap-2" data-slot="lab-study-running">
-            <span class="shrink-0 text-12-regular text-v2-state-fg-success">{language.t("research.study.running")}</span>
-            <span class={`min-w-0 truncate text-v2-text-text-base ${ROW_TEXT}`}>{experiment().title}</span>
-            <span class={`shrink-0 text-v2-text-text-faint ${FIGURES}`}>#{experiment().id}</span>
-          </div>
-        )}
-      </Show>
-    </div>
-  )
-}
-
-function Figure(props: { label: string; value: string; under?: string; good?: boolean }) {
-  return (
-    <div class="flex min-w-0 flex-col">
-      <span class="truncate text-12-regular text-v2-text-text-faint">{props.label}</span>
-      <span class="truncate text-14-mono tabular-nums text-v2-text-text-base">{props.value}</span>
-      <Show when={props.under}>
-        <span
-          class="text-12-regular [text-wrap:pretty]"
-          classList={{ "text-v2-state-fg-success": props.good, "text-v2-text-text-faint": !props.good }}
-        >
-          {props.under}
-        </span>
-      </Show>
+      <div class="grid grid-cols-3 gap-1.5">
+        <Tile label={language.t("research.study.best")}>
+          <span class="text-v2-text-text-base">{value() !== undefined ? figure(value() ?? 0) : "—"}</span>
+          <span class="text-v2-text-text-faint">{top() ? `#${top()?.id}` : ""}</span>
+          <Show when={progress() !== undefined}>
+            <span class="relative mt-1.5 block h-[3px] basis-full overflow-hidden rounded-full bg-v2-border-border-muted">
+              <span
+                class="absolute inset-y-0 left-0 rounded-full"
+                classList={{ "bg-v2-state-fg-success": met(), "bg-v2-text-text-base": !met() }}
+                style={{ width: `${(progress() ?? 0) * 100}%` }}
+              />
+            </span>
+          </Show>
+        </Tile>
+        <Tile label={language.t("research.study.target")}>
+          <span class="text-v2-text-text-base">{props.study.target !== null ? figure(props.study.target) : "—"}</span>
+          <span
+            class="basis-full font-sans text-[11px] leading-4"
+            classList={{ "text-v2-state-fg-success": met(), "text-v2-text-text-faint": !met() }}
+          >
+            {met() ? language.t("research.study.reached") : language.t("research.study.open")}
+          </span>
+        </Tile>
+        <Tile label={language.t("research.study.running")} live={run()?.status === "Running"}>
+          <Show
+            when={props.running}
+            fallback={<span class="text-v2-text-text-faint">{language.t("research.study.idle")}</span>}
+          >
+            {(experiment) => (
+              <>
+                <span class="text-v2-text-text-base">#{experiment().id}</span>
+                <span class="text-v2-text-text-faint">
+                  {run()?.status === "Running" ? duration(run()?.millis ?? 0) : language.t("research.status.Queued")}
+                </span>
+              </>
+            )}
+          </Show>
+        </Tile>
+      </div>
     </div>
   )
 }
@@ -201,13 +233,17 @@ function TreeRow(props: { line: Row; picked: boolean; onPick: () => void }) {
         #{props.line.experiment.id}
       </span>
       <span
-        class={`w-16 shrink-0 text-end ${FIGURES}`}
+        class={`w-[4.5rem] shrink-0 text-end ${FIGURES}`}
         classList={{
           "text-v2-text-text-base": props.line.value !== undefined,
           [statusClass(status())]: props.line.value === undefined,
         }}
       >
-        {props.line.value !== undefined ? figure(props.line.value) : (status() ? language.t(`research.status.${status() ?? "Queued"}`) : "—")}
+        {props.line.value !== undefined
+          ? figure(props.line.value)
+          : status()
+            ? language.t(`research.status.${status() ?? "Queued"}`)
+            : "—"}
       </span>
     </button>
   )
